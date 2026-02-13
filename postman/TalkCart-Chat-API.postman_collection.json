@@ -1,0 +1,792 @@
+{
+  "info": {
+    "name": "TalkCart - Chat API",
+    "_postman_id": "talkcart-chat-api",
+    "description": "API collection for testing TalkCart's AI Chat endpoints. Test the AI shopping assistant (The Clerk) that helps customers find products, check inventory, and make purchases through natural conversation.\n\n**Features:**\n- Natural language product search\n- Conversational shopping assistance\n- Product recommendations\n- Cart management through chat\n- Price negotiation (haggle mode)\n- Chat history tracking\n\n**Note:** Chat works for both authenticated and anonymous users. Authentication is optional but recommended for personalized experience.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sessionId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Chat Operations",
+      "item": [
+        {
+          "name": "Send Message (First Message)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has success field\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test(\"Response has message object\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('message');",
+                  "    pm.expect(jsonData.data.message).to.have.property('id');",
+                  "    pm.expect(jsonData.data.message).to.have.property('chat_session_id');",
+                  "    pm.expect(jsonData.data.message).to.have.property('role');",
+                  "    pm.expect(jsonData.data.message).to.have.property('content');",
+                  "    pm.expect(jsonData.data.message.role).to.equal('assistant');",
+                  "});",
+                  "",
+                  "pm.test(\"Content is not empty\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.message.content).to.be.a('string');",
+                  "    pm.expect(jsonData.data.message.content.length).to.be.above(0);",
+                  "});",
+                  "",
+                  "// Save session ID for subsequent requests",
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.message && jsonData.data.message.chat_session_id) {",
+                  "    pm.collectionVariables.set('sessionId', jsonData.data.message.chat_session_id);",
+                  "    console.log('✓ Session ID saved: ' + jsonData.data.message.chat_session_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Hello! I'm looking for a gift for a friend.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "chat"]
+            },
+            "description": "Send the first message to start a conversation with the AI shopping assistant. The system will automatically create a new chat session.\n\n**Request Body:**\n- message (required): The user's message text\n- session_id (optional): Omit for first message to create new session\n\n**Response includes:**\n- message: The assistant's response with role, content, and session info\n- actions: Optional array of function calls (e.g., product searches, cart adds)\n\n**Note:** Works for both authenticated and anonymous users. Session ID is returned and should be used for follow-up messages."
+          },
+          "response": [
+            {
+              "name": "Success - First Message",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"message\": \"Hello! I'm looking for a gift for a friend.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/chat",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "chat"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"message\": {\n      \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"chat_session_id\": \"550e8400-e29b-41d4-a716-446655440001\",\n      \"role\": \"assistant\",\n      \"content\": \"That's wonderful! I'd love to help you find the perfect gift! 🎁 To give you the best recommendations, could you tell me a bit more about your friend? What are their interests or style preferences? And do you have a budget in mind?\",\n      \"function_calls\": null,\n      \"created_at\": \"2024-01-15T10:30:00Z\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Send Message (Continue Conversation)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains assistant message\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.message.role).to.equal('assistant');",
+                  "    pm.expect(jsonData.data.message.content).to.be.a('string');",
+                  "});",
+                  "",
+                  "pm.test(\"Same session ID maintained\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var storedSessionId = pm.collectionVariables.get('sessionId');",
+                  "    if (storedSessionId) {",
+                  "        pm.expect(jsonData.data.message.chat_session_id).to.equal(storedSessionId);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Ensure we have a session ID from previous request",
+                  "if (!pm.collectionVariables.get('sessionId')) {",
+                  "    console.log('Warning: sessionId not set. Run \"Send Message (First Message)\" first.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"They love fashion and outdoor activities. Budget is around $300.\",\n  \"session_id\": \"{{sessionId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "chat"]
+            },
+            "description": "Continue an existing conversation by including the session_id from the previous response. The AI maintains context from earlier messages.\n\n**Request Body:**\n- message (required): The user's follow-up message\n- session_id (required): The session ID from first message\n\n**Note:** Run \"Send Message (First Message)\" first to populate the sessionId variable."
+          },
+          "response": []
+        },
+        {
+          "name": "Product Search Request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains product recommendations\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    // AI should mention products in response",
+                  "    pm.expect(jsonData.data.message.content.length).to.be.above(50);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Show me some summer clothing, something light and stylish.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "chat"]
+            },
+            "description": "Ask the AI to search for products using natural language. The AI understands semantic queries like 'summer wedding outfit' or 'gift for tech enthusiast'.\n\n**Examples:**\n- \"I need something for a summer wedding in Italy\"\n- \"Show me affordable running shoes\"\n- \"What do you have in electronics under $200?\"\n- \"I'm looking for a gift for my mom who loves gardening\"\n\n**Note:** In full implementation with LangChain, this would trigger the search_products tool and return structured product data."
+          },
+          "response": []
+        },
+        {
+          "name": "Stock Check Request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response addresses stock question\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.message.content).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Do you have this in blue? Size M?\",\n  \"session_id\": \"{{sessionId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "chat"]
+            },
+            "description": "Ask about product availability, sizes, colors, or variants. The AI can check inventory and provide accurate stock information.\n\n**Examples:**\n- \"Do you have this in blue?\"\n- \"What sizes are available for the linen suit?\"\n- \"Is this in stock?\"\n- \"When will you have more sunglasses?\""
+          },
+          "response": []
+        },
+        {
+          "name": "Add to Cart Request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"AI acknowledges cart action\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.message.content).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"I'll take the Italian linen suit. Add it to my cart!\",\n  \"session_id\": \"{{sessionId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "chat"]
+            },
+            "description": "Ask the AI to add products to your cart through conversation. No need to click any buttons!\n\n**Examples:**\n- \"Add the linen suit to my cart\"\n- \"I'll take two of those\"\n- \"Put the sunglasses in my cart please\"\n\n**Note:** Requires authentication. Run the Login request first to set the authToken.\n\n**In full implementation:** This would trigger the add_to_cart tool and actually add items to the database."
+          },
+          "response": []
+        },
+        {
+          "name": "Haggle Request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"AI responds to negotiation\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    var content = jsonData.data.message.content.toLowerCase();",
+                  "    // AI should mention price, discount, or negotiate",
+                  "    var hasNegotiation = content.includes('price') || content.includes('discount') || ",
+                  "                         content.includes('deal') || content.includes('offer');",
+                  "    pm.expect(hasNegotiation).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Can you give me a discount on the Italian suit? It's my birthday! 🎂\",\n  \"session_id\": \"{{sessionId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "chat"]
+            },
+            "description": "Try to negotiate prices with the AI! The assistant has a 'bottom price' and will evaluate your reason for a discount.\n\n**Good reasons that might work:**\n- \"It's my birthday\" 🎂\n- \"I'm buying multiple items\" 🛍️\n- \"I'm a loyal customer\" ⭐\n- Polite, friendly approach 😊\n\n**Bad approaches:**\n- Being rude or demanding 😠\n- Unrealistic lowball offers\n- No reason given\n\n**In full implementation:** This would trigger the haggle_price tool, analyze sentiment, calculate a fair discount, and generate a unique coupon code like 'BDAY-20' if approved."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Chat History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has messages array\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.have.property('messages');",
+                  "    pm.expect(jsonData.data.messages).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test(\"Messages have correct structure\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data.messages.length > 0) {",
+                  "        var firstMessage = jsonData.data.messages[0];",
+                  "        pm.expect(firstMessage).to.have.property('id');",
+                  "        pm.expect(firstMessage).to.have.property('role');",
+                  "        pm.expect(firstMessage).to.have.property('content');",
+                  "        pm.expect(firstMessage).to.have.property('created_at');",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test(\"Messages are ordered by time\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var messages = jsonData.data.messages;",
+                  "    if (messages.length > 1) {",
+                  "        for (var i = 1; i < messages.length; i++) {",
+                  "            var prevTime = new Date(messages[i-1].created_at);",
+                  "            var currTime = new Date(messages[i].created_at);",
+                  "            pm.expect(currTime.getTime()).to.be.at.least(prevTime.getTime());",
+                  "        }",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Ensure we have a session ID",
+                  "if (!pm.collectionVariables.get('sessionId')) {",
+                  "    console.log('Warning: sessionId not set. Run \"Send Message (First Message)\" first.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/chat/history?session_id={{sessionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "chat", "history"],
+              "query": [
+                {
+                  "key": "session_id",
+                  "value": "{{sessionId}}",
+                  "description": "The chat session ID to retrieve history for"
+                }
+              ]
+            },
+            "description": "Retrieve the complete conversation history for a chat session. Shows all user and assistant messages in chronological order.\n\n**Query Parameters:**\n- session_id (required): The chat session UUID\n\n**Response:**\n- messages: Array of all messages in the session, ordered by time\n\n**Note:** Run \"Send Message (First Message)\" first to populate the sessionId variable."
+          },
+          "response": [
+            {
+              "name": "Success - Chat History",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/chat/history?session_id=550e8400-e29b-41d4-a716-446655440001",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "chat", "history"],
+                  "query": [
+                    {
+                      "key": "session_id",
+                      "value": "550e8400-e29b-41d4-a716-446655440001"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"messages\": [\n      {\n        \"id\": \"msg-001\",\n        \"chat_session_id\": \"550e8400-e29b-41d4-a716-446655440001\",\n        \"role\": \"user\",\n        \"content\": \"Hello! I'm looking for a gift for a friend.\",\n        \"function_calls\": null,\n        \"created_at\": \"2024-01-15T10:30:00Z\"\n      },\n      {\n        \"id\": \"msg-002\",\n        \"chat_session_id\": \"550e8400-e29b-41d4-a716-446655440001\",\n        \"role\": \"assistant\",\n        \"content\": \"That's wonderful! I'd love to help you find the perfect gift! 🎁 To give you the best recommendations, could you tell me a bit more about your friend?\",\n        \"function_calls\": null,\n        \"created_at\": \"2024-01-15T10:30:01Z\"\n      },\n      {\n        \"id\": \"msg-003\",\n        \"chat_session_id\": \"550e8400-e29b-41d4-a716-446655440001\",\n        \"role\": \"user\",\n        \"content\": \"They love fashion and outdoor activities. Budget is around $300.\",\n        \"function_calls\": null,\n        \"created_at\": \"2024-01-15T10:31:00Z\"\n      },\n      {\n        \"id\": \"msg-004\",\n        \"chat_session_id\": \"550e8400-e29b-41d4-a716-446655440001\",\n        \"role\": \"assistant\",\n        \"content\": \"Perfect! For someone who loves fashion and the outdoors, I have some great ideas. Let me show you our Italian Linen Summer Suit - it's stylish, breathable, and perfect for outdoor events. We also have some amazing aviator sunglasses that would complete the look!\",\n        \"function_calls\": [\n          {\n            \"name\": \"search_products\",\n            \"args\": {\n              \"query\": \"fashion outdoor summer\"\n            }\n          }\n        ],\n        \"created_at\": \"2024-01-15T10:31:05Z\"\n      }\n    ]\n  }\n}"
+            },
+            {
+              "name": "Error - Missing Session ID",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/chat/history",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "chat", "history"]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"error\": \"session_id query parameter is required\"\n}"
+            }
+          ]
+        }
+      ],
+      "description": "Core chat operations including sending messages, continuing conversations, and retrieving history."
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login (Get Auth Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains token\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.token) {",
+                  "        pm.collectionVariables.set('authToken', jsonData.data.token);",
+                  "        console.log('✓ Auth token saved');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login to get JWT token for authenticated chat features like adding to cart.\n\n**Note:** Update credentials with valid user from your database."
+          },
+          "response": []
+        }
+      ],
+      "description": "Authentication for enhanced chat features (optional - chat works for anonymous users too)."
+    },
+    {
+      "name": "Test Workflow",
+      "item": [
+        {
+          "name": "1. Start Conversation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Chat initialized\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('sessionId', jsonData.data.message.chat_session_id);",
+                  "    console.log('✓ Conversation started');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Hi! What do you have for summer?\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "chat"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. Ask for Recommendations",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"AI responds with recommendations\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.message.content.length).to.be.above(20);",
+                  "    console.log('✓ Got recommendations');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Show me something stylish for a wedding.\",\n  \"session_id\": \"{{sessionId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "chat"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. Check Stock",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"AI answers stock query\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    console.log('✓ Stock checked');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Do you have this in size M?\",\n  \"session_id\": \"{{sessionId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "chat"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. Try to Haggle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"AI responds to negotiation\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    console.log('✓ Haggle attempted');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Can you give me a discount? I'm buying two items!\",\n  \"session_id\": \"{{sessionId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "chat"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5. Get Conversation History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"History retrieved\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.messages.length).to.be.at.least(2);",
+                  "    console.log('✓ Got ' + jsonData.data.messages.length + ' messages in history');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/chat/history?session_id={{sessionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "chat", "history"],
+              "query": [
+                {
+                  "key": "session_id",
+                  "value": "{{sessionId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Complete workflow testing the full chat experience:\n1. Start a new conversation\n2. Ask for product recommendations\n3. Check stock availability\n4. Try to negotiate a price\n5. Retrieve conversation history\n\nRun these in sequence using Collection Runner for automated testing."
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global pre-request script",
+          "console.log('Request to: ' + pm.request.url.toString());"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test script",
+          "pm.test(\"Response time is acceptable\", function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(10000);",
+          "});",
+          "",
+          "pm.test(\"Response is JSON\", function () {",
+          "    pm.response.to.be.json;",
+          "});"
+        ]
+      }
+    }
+  ]
+}

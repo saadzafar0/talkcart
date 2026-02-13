@@ -1,26 +1,247 @@
-# TalkCart Products API - Postman Collection
+# TalkCart API - Postman Collections
 
-This collection contains comprehensive test cases for the TalkCart Products API endpoints.
+This folder contains comprehensive test collections for the TalkCart API endpoints.
+
+## 📦 Available Collections
+
+1. **TalkCart-Products-API.postman_collection.json** - Product catalog endpoints
+2. **TalkCart-Cart-API.postman_collection.json** - Shopping cart endpoints
+3. **TalkCart-Chat-API.postman_collection.json** - AI Chat assistant endpoints (NEW!)
 
 ## Import Instructions
 
 1. Open Postman
 2. Click **Import** button
-3. Select `TalkCart-Products-API.postman_collection.json`
-4. The collection will appear in your workspace
+3. Select the collection JSON file(s) you want to import
+4. The collection(s) will appear in your workspace
 
 ## Environment Setup
 
-The collection uses a `baseUrl` variable that defaults to `http://localhost:3000`.
+All collections use variables that can be configured:
 
-### To change the base URL:
+### Collection Variables:
+- `baseUrl` - API base URL (default: `http://localhost:3000`)
+- `authToken` - JWT authentication token (auto-populated after login)
+- `sessionId` - Chat session ID (auto-populated)
+- `testProductId` - Sample product ID for testing (auto-populated)
+- `testItemId` - Sample cart item ID for testing (auto-populated)
+
+### To change variables:
 
 1. Click on the collection name
 2. Go to the **Variables** tab
-3. Update the `baseUrl` value
+3. Update the values as needed
 4. Save the collection
 
-## API Endpoints
+---
+
+## 🤖 Chat API Collection (NEW!)
+
+### Overview
+The Chat API powers TalkCart's AI Shopping Assistant - "The Clerk". This AI can help customers find products, check inventory, add items to cart, negotiate prices, and complete purchases through natural conversation.
+
+### Key Features
+- 💬 Natural language product search
+- 🛍️ Conversational shopping assistance
+- 📦 Stock checking and availability
+- 🛒 Add to cart without clicking buttons
+- 💰 Price negotiation (Haggle Mode)
+- 📝 Conversation history tracking
+- 👤 Works for both authenticated and anonymous users
+
+### API Endpoints
+
+#### 1. Send Message (`POST /api/chat`)
+
+Chat with the AI shopping assistant. Send messages and get intelligent responses.
+
+**Request Body:**
+```json
+{
+  "message": "I'm looking for a summer wedding outfit",
+  "session_id": "optional-existing-session-id"
+}
+```
+
+**Authentication:** Optional (works for anonymous users, but auth enables cart features)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "message": {
+      "id": "uuid",
+      "chat_session_id": "uuid",
+      "role": "assistant",
+      "content": "AI response text...",
+      "function_calls": null,
+      "created_at": "timestamp"
+    },
+    "actions": []
+  }
+}
+```
+
+**What the AI can do:**
+- 🔍 **Search Products**: "Show me summer dresses"
+- 📋 **Check Stock**: "Do you have this in blue?"
+- 🛒 **Add to Cart**: "Add the linen suit to my cart" (requires auth)
+- 💰 **Negotiate**: "Can you give me a discount?"
+- ℹ️ **Product Info**: "Tell me more about the Italian suit"
+- 🎯 **Recommendations**: "What should I wear to a beach wedding?"
+
+**Test Cases:**
+- ✅ First message (creates session)
+- ✅ Continue conversation (with session_id)
+- ✅ Product search requests
+- ✅ Stock availability questions
+- ✅ Add to cart requests (authenticated)
+- ✅ Price negotiation attempts
+- ✅ General product inquiries
+
+---
+
+#### 2. Get Chat History (`GET /api/chat/history`)
+
+Retrieve the complete conversation history for a chat session.
+
+**Query Parameters:**
+- `session_id` (required): The chat session UUID
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "messages": [
+      {
+        "id": "uuid",
+        "chat_session_id": "uuid",
+        "role": "user",
+        "content": "User message...",
+        "function_calls": null,
+        "created_at": "timestamp"
+      },
+      {
+        "id": "uuid",
+        "chat_session_id": "uuid",
+        "role": "assistant",
+        "content": "AI response...",
+        "function_calls": [...],
+        "created_at": "timestamp"
+      }
+    ]
+  }
+}
+```
+
+**Test Cases:**
+- ✅ Get history for existing session
+- ✅ Verify message order (chronological)
+- ✅ Validate message structure
+- ⚠️ Missing session_id error
+
+---
+
+### 🎭 The AI Clerk Personality
+
+The AI assistant has a unique personality:
+- **Warm & Friendly**: Uses emojis and conversational language
+- **Helpful**: Proactively suggests products and asks clarifying questions
+- **Knowledgeable**: Understands fashion, style, and product details
+- **Empowered**: Can check stock, add to cart, and negotiate prices
+- **Professional**: Maintains boundaries and store policies
+
+### 🔄 Chat Workflow
+
+**Complete test workflow included in collection:**
+
+1. **Start Conversation** → "Hi! What do you have for summer?"
+2. **Get Recommendations** → "Show me something stylish for a wedding"
+3. **Check Stock** → "Do you have this in size M?"
+4. **Try to Haggle** → "Can you give me a discount? I'm buying two!"
+5. **Get History** → Retrieve full conversation
+
+Run the "Test Workflow" folder in Collection Runner for automated testing.
+
+---
+
+### 💰 Haggle Mode
+
+The AI can negotiate prices! Examples:
+
+**Good approaches (may get discount):**
+```
+"Can you give me a discount? It's my birthday! 🎂"
+"I'm buying multiple items, any deals available?"
+"I've been a loyal customer, can you help me out?"
+```
+
+**Poor approaches (may backfire):**
+```
+"Give me 50% off or I'm leaving!" (rude)
+"This is too expensive!" (no reason)
+"I'll pay $10 for this $300 item" (unrealistic)
+```
+
+**In full implementation:**
+- AI analyzes sentiment (polite vs. rude)
+- Calculates fair discount based on reason
+- Has a "bottom price" it won't go below
+- Generates unique coupon codes (e.g., "BDAY-20")
+- Can raise prices if customer is rude!
+
+---
+
+### 📚 Example Conversations
+
+#### Example 1: Product Search
+```
+User: "I need an outfit for a summer wedding in Italy"
+AI: "Perfect! For a summer wedding in Italy, I'd recommend our 
+     Italian Linen Summer Suit - it's lightweight, breathable, 
+     and absolutely stunning! Would you like to see it?"
+```
+
+#### Example 2: Stock Check
+```
+User: "Do you have the linen suit in blue?"
+AI: "Let me check that for you! The Italian Linen Summer Suit 
+     is currently available in Beige and Light Gray. We don't 
+     have it in blue at the moment. Would either of these colors 
+     work for you?"
+```
+
+#### Example 3: Add to Cart
+```
+User: "I'll take the suit in size 42!"
+AI: "Excellent choice! I've added the Italian Linen Summer Suit 
+     (Size 42) to your cart. That's $299.99. Would you like to 
+     add anything else, or proceed to checkout?"
+```
+
+---
+
+### 🔧 Implementation Notes
+
+**Current Implementation:**
+- ✅ Database storage for chat sessions/messages
+- ✅ Basic Gemini AI integration
+- ✅ Conversation context (last 5 messages)
+- ✅ Personality system prompt
+- ✅ Works for authenticated & anonymous users
+
+**Coming Soon (with full LangChain):**
+- 🔄 Real tool calling (search_products, add_to_cart, etc.)
+- 🔄 RAG semantic search integration
+- 🔄 Sentiment analysis for haggling
+- 🔄 Automatic coupon code generation
+- 🔄 UI actions triggering (vibe filter)
+
+---
+
+## 🛍️ Cart API Collection
 
 ### 1. Products Listing (`GET /api/products`)
 
