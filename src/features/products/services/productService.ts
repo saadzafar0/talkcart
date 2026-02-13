@@ -175,27 +175,77 @@ export const productService = {
 
   /**
    * RAG semantic search using vector embeddings
-   * This will be implemented with LangChain integration
+   * Falls back to text search if embedding generation fails
    */
   async search(query: string, limit = 10): Promise<Product[]> {
     const supabase = createServerSupabase();
 
-    // For now, use basic text search
-    // TODO: Implement vector similarity search with embeddings
-    // This will call the search_products_by_embedding function defined in schema
-    
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('is_active', true)
-      .or(`name.ilike.%${query}%,description.ilike.%${query}%,metadata::text.ilike.%${query}%`)
-      .limit(limit);
+    try {
+      // Step 1: Generate embedding for the query
+      const { embeddingService } = await import(
+        '@/langchain/embeddings/embeddingService'
+      );
+      const queryEmbedding = await embeddingService.generateEmbedding(query);
 
-    if (error) {
-      throw new Error(`Failed to search products: ${error.message}`);
+      // Step 2: Vector similarity search via Supabase RPC
+      const { data: matches, error: rpcError } = await supabase.rpc(
+        'search_products_by_embedding',
+        {
+          query_embedding: JSON.stringify(queryEmbedding),
+          match_threshold: 0.7,
+          match_count: limit,
+        }
+      );
+
+      if (rpcError) {
+        throw new Error(rpcError.message);
+      }
+
+      if (!matches || matches.length === 0) {
+        return [];
+      }
+
+      // Step 3: Fetch full product details for matched IDs
+      const productIds = matches.map(
+        (m: { product_id: string }) => m.product_id
+      );
+
+      const { data: products, error: fetchError } = await supabase
+        .from('products')
+        .select('*')
+        .in('id', productIds)
+        .eq('is_active', true);
+
+      if (fetchError) {
+        throw new Error(fetchError.message);
+      }
+
+      // Preserve similarity-based ordering from the RPC
+      const productMap = new Map(
+        (products || []).map((p) => [p.id, p])
+      );
+      return productIds
+        .map((id: string) => productMap.get(id))
+        .filter((p: Product | undefined): p is Product => !!p);
+    } catch (error) {
+      // Fallback to basic text search if vector search fails
+      console.error('Vector search failed, falling back to text search:', error);
+
+      const { data, error: textError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_active', true)
+        .or(
+          `name.ilike.%${query}%,description.ilike.%${query}%,metadata::text.ilike.%${query}%`
+        )
+        .limit(limit);
+
+      if (textError) {
+        throw new Error(`Failed to search products: ${textError.message}`);
+      }
+
+      return (data as Product[]) || [];
     }
-
-    return (data as Product[]) || [];
   },
 
   /**
