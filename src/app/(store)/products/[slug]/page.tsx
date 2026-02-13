@@ -54,17 +54,36 @@ export default function ProductDetailPage() {
     async function fetchProduct() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/products/${slug}`);
+        const res = await fetch(
+          `/api/products/${slug}?includeVariants=true&includeReviews=true&includeRelated=true`
+        );
         if (!res.ok) {
           router.push('/products');
           return;
         }
         const data = await res.json();
-        setProduct(data.data);
+        const payload = data.data;
 
-        // Fetch variants and reviews in parallel
-        if (data.data?.id) {
-          fetchExtras(data.data.id);
+        setProduct(payload.product);
+        setVariants(payload.variants || []);
+        setReviews(payload.reviews || []);
+
+        // Fetch related products by category
+        if (payload.product?.category_id) {
+          try {
+            const relRes = await fetch(
+              `/api/products?category=${payload.product.category_id}&limit=5`
+            );
+            if (relRes.ok) {
+              const relData = await relRes.json();
+              const related = (relData.data?.products || []).filter(
+                (p: Product) => p.id !== payload.product.id
+              );
+              setRelatedProducts(related.slice(0, 4));
+            }
+          } catch {
+            // Silently handle related products failure
+          }
         }
       } catch {
         router.push('/products');
@@ -74,32 +93,6 @@ export default function ProductDetailPage() {
     }
     fetchProduct();
   }, [slug, router]);
-
-  async function fetchExtras(productId: string) {
-    try {
-      const [variantsRes, reviewsRes, relatedRes] = await Promise.allSettled([
-        fetch(`/api/admin/products/${productId}/variants`),
-        fetch(`/api/products?category=${product?.category_id || ''}&limit=4`),
-        Promise.resolve(null), // placeholder for reviews endpoint
-      ]);
-
-      if (variantsRes.status === 'fulfilled' && variantsRes.value.ok) {
-        const vData = await variantsRes.value.json();
-        setVariants(vData.data || []);
-      }
-
-      if (reviewsRes.status === 'fulfilled' && reviewsRes.value.ok) {
-        const rData = await reviewsRes.value.json();
-        const related = (rData.data?.products || []).filter((p: Product) => p.id !== productId);
-        setRelatedProducts(related.slice(0, 4));
-      }
-
-      // Reviews — no dedicated endpoint yet, so leaving empty
-      void relatedRes;
-    } catch {
-      // Silently handle
-    }
-  }
 
   async function handleAddToCart() {
     if (!product) return;

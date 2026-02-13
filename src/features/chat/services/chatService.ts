@@ -5,7 +5,7 @@ import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 // Initialize Gemini via LangChain
 const createGeminiModel = () => {
   return new ChatGoogleGenerativeAI({
-    modelName: 'gemini-1.5-flash',
+    model: 'gemini-2.5-flash',
     apiKey: process.env.GEMINI_API_KEY,
     temperature: 0.7,
   });
