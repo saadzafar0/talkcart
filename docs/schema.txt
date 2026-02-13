@@ -361,3 +361,5 @@ INSERT INTO products (id, name, slug, description, category_id, base_price, mini
   50,
   '{"uv_protection": "UV400", "frame_material": "metal", "lens_type": "polarized"}'::jsonb
 );
+
+ALTER TABLE product_embeddings ADD CONSTRAINT product_embeddings_product_id_key UNIQUE (product_id);
