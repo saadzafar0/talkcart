@@ -1,0 +1,854 @@
+{
+  "info": {
+    "name": "TalkCart - Products API",
+    "_postman_id": "talkcart-products-api",
+    "description": "API collection for testing TalkCart's Product endpoints. Includes listing, filtering, searching, and product detail endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "Get All Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has success field\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test(\"Response has products array\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('products');",
+                  "    pm.expect(jsonData.data.products).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test(\"Response has pagination info\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('total');",
+                  "    pm.expect(jsonData.data).to.have.property('page');",
+                  "    pm.expect(jsonData.data).to.have.property('limit');",
+                  "    pm.expect(jsonData.data).to.have.property('hasMore');",
+                  "    pm.expect(jsonData.data).to.have.property('totalPages');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"]
+            },
+            "description": "Fetches all active products without any filters. Returns paginated results with default limit of 20 items per page."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Products - With Filters",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"All products match price range\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    jsonData.data.products.forEach(function(product) {",
+                  "        pm.expect(product.base_price).to.be.at.least(50);",
+                  "        pm.expect(product.base_price).to.be.at.most(300);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?minPrice=50&maxPrice=300&category=fashion&sortBy=price_asc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "minPrice",
+                  "value": "50",
+                  "description": "Minimum price filter"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "300",
+                  "description": "Maximum price filter"
+                },
+                {
+                  "key": "category",
+                  "value": "fashion",
+                  "description": "Category slug"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "price_asc",
+                  "description": "Sort by: price_asc, price_desc, rating, newest"
+                }
+              ]
+            },
+            "description": "Fetches products with multiple filters applied: price range, category, and sorting."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Products - By Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains products\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.products).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?category=fashion",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "fashion",
+                  "description": "Filter by category slug"
+                }
+              ]
+            },
+            "description": "Fetches products filtered by a specific category."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Products - Sort by Price (Low to High)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?sortBy=price_asc&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "sortBy",
+                  "value": "price_asc"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Returns products sorted by price in ascending order (cheapest first)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Products - Sort by Price (High to Low)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?sortBy=price_desc&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "sortBy",
+                  "value": "price_desc"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Returns products sorted by price in descending order (most expensive first)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Products - Sort by Rating",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?sortBy=rating&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "sortBy",
+                  "value": "rating"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Returns products sorted by rating (highest rated first)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Products - Sort by Newest",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?sortBy=newest&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "sortBy",
+                  "value": "newest"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Returns newest products first."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Products - Pagination (Page 2)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?page=2&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "2",
+                  "description": "Page number (1-based)"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page (max 100)"
+                }
+              ]
+            },
+            "description": "Fetches the second page of products with 10 items per page."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Products - Text Search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?search=linen",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "linen",
+                  "description": "Search term to match in product name or description"
+                }
+              ]
+            },
+            "description": "Searches products by text query in name and description fields."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Products - Invalid Page Number",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error message is present\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error).to.include('Page');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?page=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Tests validation - page number must be greater than 0."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Products - Invalid Limit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error message is present\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error).to.include('Limit');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?limit=150",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "150"
+                }
+              ]
+            },
+            "description": "Tests validation - limit must be between 1 and 100."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Products - Invalid Price Range",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error message about price range\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error).to.include('minPrice');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?minPrice=300&maxPrice=100",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "minPrice",
+                  "value": "300"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Tests validation - minPrice cannot be greater than maxPrice."
+          },
+          "response": []
+        }
+      ],
+      "description": "Endpoints for listing and filtering products."
+    },
+    {
+      "name": "Product Details",
+      "item": [
+        {
+          "name": "Get Product by Slug",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has product details\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('product');",
+                  "    pm.expect(jsonData.data.product).to.have.property('id');",
+                  "    pm.expect(jsonData.data.product).to.have.property('name');",
+                  "    pm.expect(jsonData.data.product).to.have.property('slug');",
+                  "    pm.expect(jsonData.data.product).to.have.property('base_price');",
+                  "});",
+                  "",
+                  "pm.test(\"Response has variants\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('variants');",
+                  "    pm.expect(jsonData.data.variants).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test(\"Response has reviews\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('reviews');",
+                  "    pm.expect(jsonData.data.reviews).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/italian-linen-summer-suit",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "italian-linen-summer-suit"]
+            },
+            "description": "Fetches a single product by its slug with full details including variants and reviews."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product - Without Variants",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/italian-linen-summer-suit?includeVariants=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "italian-linen-summer-suit"],
+              "query": [
+                {
+                  "key": "includeVariants",
+                  "value": "false",
+                  "description": "Exclude variants from response"
+                }
+              ]
+            },
+            "description": "Fetches product details without variant information."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product - Without Reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/italian-linen-summer-suit?includeReviews=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "italian-linen-summer-suit"],
+              "query": [
+                {
+                  "key": "includeReviews",
+                  "value": "false",
+                  "description": "Exclude reviews from response"
+                }
+              ]
+            },
+            "description": "Fetches product details without review information."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product - With Related Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/italian-linen-summer-suit?includeRelated=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "italian-linen-summer-suit"],
+              "query": [
+                {
+                  "key": "includeRelated",
+                  "value": "true",
+                  "description": "Include related products"
+                }
+              ]
+            },
+            "description": "Fetches product with related products from the same category."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product - Minimal Response",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/italian-linen-summer-suit?includeVariants=false&includeReviews=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "italian-linen-summer-suit"],
+              "query": [
+                {
+                  "key": "includeVariants",
+                  "value": "false"
+                },
+                {
+                  "key": "includeReviews",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "Fetches only basic product information without variants or reviews."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product - Not Found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Error message is present\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error).to.include('not found');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/non-existent-product-slug",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "non-existent-product-slug"]
+            },
+            "description": "Tests 404 error when product slug doesn't exist."
+          },
+          "response": []
+        }
+      ],
+      "description": "Endpoints for fetching individual product details."
+    },
+    {
+      "name": "Product Search (RAG)",
+      "item": [
+        {
+          "name": "Semantic Search - Summer Wedding",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains search results\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('products');",
+                  "    pm.expect(jsonData.data).to.have.property('query');",
+                  "    pm.expect(jsonData.data).to.have.property('count');",
+                  "});",
+                  "",
+                  "pm.test(\"Query matches request\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.query).to.equal(pm.request.body.raw ? JSON.parse(pm.request.body.raw).query : '');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"outfit for summer wedding in Italy\",\n  \"limit\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/products/search",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "search"]
+            },
+            "description": "RAG-based semantic search for products. Should return linens, formal wear, sunglasses even without exact keyword matches."
+          },
+          "response": []
+        },
+        {
+          "name": "Semantic Search - Casual Style",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"comfortable casual everyday clothes\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/products/search",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "search"]
+            },
+            "description": "Search for casual comfortable clothing."
+          },
+          "response": []
+        },
+        {
+          "name": "Semantic Search - Specific Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"gold sunglasses for bright sunny days\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/products/search",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "search"]
+            },
+            "description": "Search for specific item type with descriptive context."
+          },
+          "response": []
+        },
+        {
+          "name": "Semantic Search - With Custom Limit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"linen\",\n  \"limit\": 5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/products/search",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "search"]
+            },
+            "description": "Search with custom result limit."
+          },
+          "response": []
+        },
+        {
+          "name": "Search - Missing Query",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error message about missing query\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error).to.include('Query');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"limit\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/products/search",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "search"]
+            },
+            "description": "Tests validation - query field is required."
+          },
+          "response": []
+        },
+        {
+          "name": "Search - Empty Query",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error message about empty query\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error).to.include('empty');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"   \"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/products/search",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "search"]
+            },
+            "description": "Tests validation - query cannot be empty or whitespace only."
+          },
+          "response": []
+        },
+        {
+          "name": "Search - Query Too Long",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error message about query length\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error).to.include('too long');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"a\".repeat(501)\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/products/search",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "search"]
+            },
+            "description": "Tests validation - query must be 500 characters or less."
+          },
+          "response": []
+        }
+      ],
+      "description": "RAG-based semantic search endpoints for intelligent product discovery."
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ]
+}
