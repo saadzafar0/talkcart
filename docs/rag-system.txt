@@ -1,0 +1,1051 @@
+================================================
+TALKCHART - RAG SYSTEM WORKFLOW
+================================================
+
+Complete workflow for the Retrieval-Augmented Generation
+system that powers the AI Clerk, semantic product search,
+haggle mode, and the full chat-to-purchase pipeline.
+
+================================================
+1. SYSTEM OVERVIEW
+================================================
+
+The RAG system is the brain behind TalkChart's AI shopping
+experience. It connects:
+
+  USER MESSAGE
+       |
+       v
+  LANGCHAIN AGENT (Gemini LLM + tools)
+       |
+       ├──> Semantic Search (pgvector embeddings)
+       ├──> Product Filtering (Supabase queries)
+       ├──> Cart Management (add/remove/view)
+       ├──> Stock Checking (live inventory)
+       ├──> Discount Application (validate codes)
+       └──> Price Haggling (negotiation agent)
+       |
+       v
+  STRUCTURED RESPONSE (text + actions)
+
+Two distinct agents:
+  1. Clerk Agent   → General shopping assistant
+  2. Haggle Agent  → Price negotiation specialist
+
+Both use Gemini 1.5 Flash via LangChain, bound with
+different tool sets and personality prompts.
+
+================================================
+2. EMBEDDING PIPELINE
+================================================
+
+Products must be embedded before they can be semantically
+searched. This happens automatically when admin creates
+or edits products, and can be triggered manually.
+
+-----------------------------------------------
+2A. EMBEDDING TEXT CONSTRUCTION
+-----------------------------------------------
+
+For each product, we build a rich text representation:
+
+  buildEmbeddingText(product) → string
+
+  Template:
+  "{name}. {description}. Category: {category_name}.
+   {metadata.key1}: {metadata.value1}.
+   {metadata.key2}: {metadata.value2}.
+   Price: ${base_price}"
+
+  Example:
+  "Italian Linen Summer Suit. Perfect for weddings and
+   outdoor events in warm climates. Category: Fashion.
+   Material: 100% Italian Linen. Occasion: formal.
+   Season: summer. Fit: slim. Price: $299.99"
+
+Why this format:
+- Includes all searchable attributes in natural language
+- Metadata key-value pairs make attribute search work
+  ("summer" or "linen" will match via embedding similarity)
+- Price included so price-related queries have context
+- Category name (not ID) for semantic meaning
+
+-----------------------------------------------
+2B. EMBEDDING GENERATION
+-----------------------------------------------
+
+Service: src/langchain/embeddings/embeddingService.ts
+
+  embeddingService.generateEmbedding(text) → number[768]
+
+Implementation:
+  1. Initialize GoogleGenerativeAIEmbeddings:
+     - model: "text-embedding-004"
+     - API key: process.env.GEMINI_API_KEY
+  2. Call embedDocuments([text]) or embedQuery(text)
+  3. Returns 768-dimensional float vector
+
+  embeddingService.generateBatch(texts) → number[768][]
+  - For bulk operations (re-embed all)
+  - Calls embedDocuments(texts)
+  - Returns array of 768-dim vectors
+
+LangChain integration:
+  import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
+
+  const embeddings = new GoogleGenerativeAIEmbeddings({
+    model: "text-embedding-004",
+    apiKey: process.env.GEMINI_API_KEY,
+  });
+
+-----------------------------------------------
+2C. EMBEDDING STORAGE
+-----------------------------------------------
+
+Database table: product_embeddings
+  - product_id: UUID (FK → products, ON DELETE CASCADE)
+  - embedding: vector(768)
+  - content: TEXT (the text that was embedded)
+  - created_at: TIMESTAMP
+
+Index: ivfflat using vector_cosine_ops (lists = 100)
+
+Storage flow:
+  1. Build text → buildEmbeddingText(product)
+  2. Generate vector → embeddingService.generateEmbedding(text)
+  3. Upsert → product_embeddings (product_id, embedding, content)
+
+Trigger points:
+  - Admin creates product → auto-embed
+  - Admin updates product (name/description/metadata) → re-embed
+  - Admin deletes product → CASCADE auto-deletes embedding
+  - POST /api/admin/embed { productId } → embed single product
+  - POST /api/admin/embed { all: true } → re-embed all products
+
+-----------------------------------------------
+2D. ADMIN PANEL → EMBEDDING INTEGRATION
+-----------------------------------------------
+
+When the admin adds, edits, or deletes a product via the
+admin panel, embeddings are handled automatically. The admin
+does NOT need to manually trigger embedding — it happens as
+part of the product CRUD flow.
+
+Files involved:
+  - src/features/admin/services/productAdminService.ts
+  - src/features/admin/utils/embedProduct.ts
+  - src/langchain/embeddings/embeddingService.ts
+
+---
+
+FLOW 1: ADMIN CREATES A NEW PRODUCT
+
+  Admin fills out product form (name, description, category,
+  prices, stock, metadata, image)
+       |
+       v
+  POST /api/admin/products
+       |
+       v
+  productAdminService.create(data)
+       |
+       ├── 1. Generate slug from product name
+       │       "Italian Linen Summer Suit"
+       │       → "italian-linen-summer-suit"
+       │
+       ├── 2. INSERT into products table
+       │       → Returns created product with ID
+       │
+       ├── 3. AUTO-EMBED (called immediately after insert):
+       │       embedProduct(product.id)
+       │         │
+       │         ├── a. Fetch product + category name from DB
+       │         │
+       │         ├── b. Build embedding text:
+       │         │      "Italian Linen Summer Suit. Perfect for
+       │         │       weddings. Category: Fashion. Material:
+       │         │       100% Italian Linen. Price: $299.99"
+       │         │
+       │         ├── c. Call embeddingService.generateEmbedding(text)
+       │         │      → Gemini text-embedding-004
+       │         │      → Returns 768-dimensional vector
+       │         │
+       │         └── d. UPSERT into product_embeddings:
+       │                (product_id, embedding, content)
+       │
+       └── 4. Return created product to admin
+       |
+       v
+  PRODUCT IS NOW IMMEDIATELY SEARCHABLE VIA RAG
+  (Customer can find it via AI Clerk semantic search)
+
+  Note: If embedding generation fails (e.g. Gemini API down),
+  the product is still created — embedding failure is logged
+  but does not block product creation. Admin can re-embed
+  later via /api/admin/embed.
+
+---
+
+FLOW 2: ADMIN EDITS A PRODUCT
+
+  Admin changes product name, description, or metadata
+       |
+       v
+  PATCH /api/admin/products/:id
+       |
+       v
+  productAdminService.update(productId, data)
+       |
+       ├── 1. UPDATE products table
+       │       (also regenerates slug if name changed)
+       │
+       ├── 2. CHECK: Did name, description, or metadata change?
+       │       │
+       │       ├── YES → RE-EMBED:
+       │       │         embedProduct(product.id)
+       │       │         (same flow as create step 3 above)
+       │       │         Old embedding is replaced via UPSERT
+       │       │
+       │       └── NO → Skip embedding
+       │                (price-only or stock-only changes
+       │                 don't need re-embedding since the
+       │                 semantic meaning hasn't changed)
+       │
+       └── 3. Return updated product to admin
+
+---
+
+FLOW 3: ADMIN DELETES A PRODUCT
+
+  Admin clicks delete on a product
+       |
+       v
+  DELETE /api/admin/products/:id
+       |
+       v
+  productAdminService.delete(productId)
+       |
+       ├── DELETE FROM products WHERE id = productId
+       │
+       └── product_embeddings row is AUTOMATICALLY deleted
+           via ON DELETE CASCADE foreign key constraint
+       |
+       v
+  PRODUCT IS NO LONGER SEARCHABLE
+  (Removed from vector search results immediately)
+
+---
+
+FLOW 4: MANUAL RE-EMBED (BULK)
+
+  Used when you change the embedding model, update the
+  text template, or suspect embeddings are stale.
+
+  Admin triggers via API:
+  POST /api/admin/embed { all: true }
+       |
+       v
+  embedAllProducts()
+       |
+       ├── Fetch all active products from DB
+       ├── Loop through each product:
+       │     ├── Build new embedding text
+       │     ├── Generate new vector via Gemini
+       │     └── UPSERT into product_embeddings
+       │
+       └── Return: { success: 42, failed: 0 }
+
+  This is a background-style operation. For a store with
+  100 products, it takes ~30-60 seconds depending on
+  Gemini API response times.
+
+---
+
+FLOW 5: MANUAL RE-EMBED (SINGLE PRODUCT)
+
+  POST /api/admin/embed { productId: "uuid-here" }
+       |
+       v
+  embedProduct(productId)
+       |
+       v
+  Same as create step 3 above — fetches product,
+  builds text, generates vector, upserts embedding.
+
+---
+
+SUMMARY TABLE:
+
+  Admin Action              │ Embedding Behavior
+  ──────────────────────────┼──────────────────────────────
+  Create product            │ Auto-generated immediately
+  Edit name/desc/metadata   │ Auto-regenerated (upsert)
+  Edit price/stock only     │ No re-embed needed
+  Delete product            │ Auto-deleted (CASCADE)
+  POST /embed {productId}   │ Force re-embed one product
+  POST /embed {all: true}   │ Force re-embed all products
+
+================================================
+3. SEMANTIC SEARCH FLOW
+================================================
+
+When a user asks something like "show me something for
+a summer wedding in Italy", this is what happens:
+
+-----------------------------------------------
+3A. QUERY EMBEDDING
+-----------------------------------------------
+
+  User query: "summer wedding outfit"
+       |
+       v
+  embeddingService.generateEmbedding("summer wedding outfit")
+       |
+       v
+  768-dimensional query vector
+
+-----------------------------------------------
+3B. VECTOR SIMILARITY SEARCH
+-----------------------------------------------
+
+The query vector is compared against all product embeddings
+using cosine similarity via pgvector.
+
+Database function: search_products_by_embedding
+
+  SELECT
+    p.id AS product_id,
+    p.name AS product_name,
+    1 - (pe.embedding <=> query_embedding) AS similarity
+  FROM product_embeddings pe
+  JOIN products p ON p.id = pe.product_id
+  WHERE p.is_active = true
+    AND 1 - (pe.embedding <=> query_embedding) > match_threshold
+  ORDER BY similarity DESC
+  LIMIT match_count;
+
+Parameters:
+  - query_embedding: vector(768) — the embedded user query
+  - match_threshold: float (default 0.7) — minimum similarity
+  - match_count: int (default 5) — max results
+
+Returns:
+  - product_id, product_name, similarity score
+
+-----------------------------------------------
+3C. PRODUCT ENRICHMENT
+-----------------------------------------------
+
+After getting matching product IDs from vector search,
+we fetch full product details:
+
+  1. Get product IDs from similarity search
+  2. Query products table with all fields:
+     - name, description, base_price, image_url, images
+     - stock_quantity, rating, review_count
+     - category (via join)
+     - variants (via join)
+  3. Return enriched product objects to the agent
+
+This two-step approach (search → enrich) keeps the vector
+search fast and the response data rich.
+
+================================================
+4. LANGCHAIN TOOL DEFINITIONS
+================================================
+
+All tools use LangChain's DynamicStructuredTool with
+Zod schemas for input validation.
+
+-----------------------------------------------
+4A. search_products
+-----------------------------------------------
+
+Purpose: Semantic search for products using natural language
+
+Input schema:
+  {
+    query: string           // Natural language search query
+    limit?: number          // Max results (default: 5)
+  }
+
+Implementation:
+  1. Call embeddingService.generateEmbedding(query)
+  2. Call search_products_by_embedding RPC via Supabase
+  3. Fetch full product details for matched IDs
+  4. Return formatted product list with:
+     - name, price, image, stock status, rating
+     - similarity score for relevance ranking
+
+-----------------------------------------------
+4B. filter_products
+-----------------------------------------------
+
+Purpose: Filter products by structured criteria
+
+Input schema:
+  {
+    category?: string       // Category name or slug
+    min_price?: number      // Minimum price
+    max_price?: number      // Maximum price
+    sort_by?: string        // "price_asc" | "price_desc" | "rating" | "newest"
+    limit?: number          // Max results (default: 10)
+  }
+
+Implementation:
+  1. Build Supabase query with filters
+  2. Apply sorting
+  3. Return paginated product list
+
+Use case: When user says "show me shoes under $100"
+  → agent extracts: category="shoes", max_price=100
+
+-----------------------------------------------
+4C. check_stock
+-----------------------------------------------
+
+Purpose: Check inventory for a specific product/variant
+
+Input schema:
+  {
+    product_id: string      // Product UUID
+    variant_id?: string     // Optional variant UUID
+  }
+
+Implementation:
+  1. Query product_variants (if variant_id provided)
+     OR products.stock_quantity (if just product_id)
+  2. Return:
+     - in_stock: boolean
+     - quantity: number
+     - variant details (color, size) if applicable
+
+Use case: "Do you have this in size M?"
+  → agent uses check_stock with variant filter
+
+-----------------------------------------------
+4D. add_to_cart
+-----------------------------------------------
+
+Purpose: Add a product to the user's shopping cart
+
+Input schema:
+  {
+    product_id: string      // Product UUID
+    variant_id?: string     // Optional variant UUID
+    quantity?: number       // Default: 1
+  }
+
+Implementation:
+  1. Verify product exists and is active
+  2. Check stock availability
+  3. Get or create cart for user (via session/auth)
+  4. Insert into cart_items (or increment quantity)
+  5. Return updated cart summary
+
+Use case: "Add the linen suit to my cart"
+  → agent calls add_to_cart
+
+-----------------------------------------------
+4E. apply_discount
+-----------------------------------------------
+
+Purpose: Validate and apply a discount code
+
+Input schema:
+  {
+    code: string            // Discount code
+    cart_id?: string        // Cart to apply to
+  }
+
+Implementation:
+  1. Look up discount_codes by code
+  2. Validate:
+     - is_active = true
+     - Not expired
+     - Usage count < usage_limit
+     - Min purchase amount met (if set)
+  3. Calculate discount amount
+  4. Return discount details + new total
+
+Use case: "I have a code SAVE20"
+  → agent calls apply_discount("SAVE20")
+
+-----------------------------------------------
+4F. haggle_price
+-----------------------------------------------
+
+Purpose: Initiate or continue price negotiation
+
+Input schema:
+  {
+    product_id: string      // Product to haggle on
+    message: string         // User's haggle message
+    session_id?: string     // Existing haggle session
+  }
+
+Implementation:
+  1. Get product's base_price and minimum_price
+  2. Delegate to haggle agent for negotiation logic
+  3. Create or update haggle_sessions record
+  4. Return:
+     - counter-offer or acceptance
+     - current session state
+     - discount code (if deal accepted)
+
+Use case: "Can I get a better price on the sunglasses?"
+  → agent calls haggle_price
+
+================================================
+5. CLERK AGENT ARCHITECTURE
+================================================
+
+File: src/langchain/agents/clerkAgent.ts
+
+The clerk agent is the main AI shopping assistant.
+
+-----------------------------------------------
+5A. AGENT SETUP
+-----------------------------------------------
+
+  import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+  import { createToolCallingAgent, AgentExecutor } from "langchain/agents";
+  import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
+
+  Setup:
+  1. Create LLM:
+     const llm = new ChatGoogleGenerativeAI({
+       model: "gemini-1.5-flash",
+       apiKey: process.env.GEMINI_API_KEY,
+       temperature: 0.7,
+     });
+
+  2. Bind tools:
+     const tools = [
+       searchProductsTool,     // Semantic search
+       filterProductsTool,     // Structured filtering
+       addToCartTool,          // Cart management
+       checkStockTool,         // Inventory check
+       applyDiscountTool,      // Discount codes
+       hagglePriceTool,        // Price negotiation
+     ];
+
+  3. Create prompt with system message + chat history:
+     const prompt = ChatPromptTemplate.fromMessages([
+       ["system", CLERK_SYSTEM_PROMPT],
+       new MessagesPlaceholder("chat_history"),
+       ["human", "{input}"],
+       new MessagesPlaceholder("agent_scratchpad"),
+     ]);
+
+  4. Create agent + executor:
+     const agent = createToolCallingAgent({ llm, tools, prompt });
+     const executor = new AgentExecutor({ agent, tools });
+
+-----------------------------------------------
+5B. AGENT EXECUTION FLOW
+-----------------------------------------------
+
+  User sends message
+       |
+       v
+  POST /api/chat (body: { message, session_id? })
+       |
+       v
+  chatService.sendMessage(userId, data)
+       |
+       ├── 1. Get or create chat session
+       ├── 2. Load chat history from DB (last N messages)
+       ├── 3. Store user message in chat_messages
+       ├── 4. Build chat_history as LangChain messages
+       ├── 5. Execute clerk agent:
+       │       executor.invoke({
+       │         input: user_message,
+       │         chat_history: [...previous_messages],
+       │       })
+       │       |
+       │       ├── LLM decides which tool(s) to call
+       │       ├── Tool executes (search, cart, etc.)
+       │       ├── LLM sees tool result
+       │       ├── LLM may call more tools
+       │       └── LLM generates final response
+       │
+       ├── 6. Store assistant message in chat_messages
+       ├── 7. Store function_calls (tool invocations) in message
+       └── 8. Return { message, actions }
+       |
+       v
+  Client renders message + executes actions
+
+-----------------------------------------------
+5C. CLERK PERSONALITY PROMPT
+-----------------------------------------------
+
+  Already implemented in:
+  src/langchain/prompts/clerkPersonality.ts
+
+  Key traits:
+  - Friendly, witty, concise
+  - Knowledgeable about all store products
+  - Enthusiastic but honest
+  - Can search, filter, add to cart, check stock, haggle
+  - Admits when it doesn't know something
+
+-----------------------------------------------
+5D. MULTI-TOOL ORCHESTRATION
+-----------------------------------------------
+
+The agent may chain multiple tools in a single turn:
+
+  User: "Do you have a nice bag for a beach trip under $50?"
+       |
+       v
+  Agent reasoning:
+    1. This is a product search → call search_products("beach bag")
+    2. User wants under $50 → filter results by price
+    3. Check stock for top matches
+       |
+       v
+  Tool calls:
+    search_products({ query: "beach bag", limit: 5 })
+      → returns 5 matching products
+    filter_products({ max_price: 50, category: "bags" })
+      → narrows results
+       |
+       v
+  Agent response:
+    "I found this beautiful canvas beach tote for $39.99!
+     It's perfect for a day at the shore. Want me to add
+     it to your cart?"
+
+Another example (purchase flow):
+
+  User: "Add it to my cart"
+       |
+       v
+  Agent:
+    add_to_cart({ product_id: "xxx", quantity: 1 })
+       |
+       v
+  "Done! The beach tote is in your cart. Your total is $39.99.
+   Ready to checkout, or do you want to keep browsing?"
+
+================================================
+6. HAGGLE AGENT ARCHITECTURE
+================================================
+
+File: src/langchain/agents/haggleAgent.ts
+
+A specialized agent for price negotiation.
+
+-----------------------------------------------
+6A. HAGGLE FLOW
+-----------------------------------------------
+
+  User: "Can I get a discount on this?"
+       |
+       v
+  Clerk agent detects haggle intent
+       |
+       v
+  Calls haggle_price tool
+       |
+       v
+  haggleService.negotiate(userId, {
+    product_id,
+    message: "Can I get a discount?",
+    session_id: null (first message)
+  })
+       |
+       v
+  Haggle agent executes:
+    1. Fetch product: base_price, minimum_price
+    2. Create haggle_sessions record (status: negotiating)
+    3. Run haggle LLM with:
+       - HAGGLE_SYSTEM_PROMPT
+       - Product price range (base → minimum)
+       - User message + sentiment analysis
+    4. LLM generates:
+       - Counter-offer or acceptance
+       - The vibe (playful, firm, generous)
+       |
+       v
+  Return to clerk agent:
+    { message: "I can do 10% off...", session: {...} }
+       |
+       v
+  Clerk relays to user with personality
+
+-----------------------------------------------
+6B. HAGGLE RULES (from HAGGLE_SYSTEM_PROMPT)
+-----------------------------------------------
+
+  NEVER go below minimum_price
+  Max discount: 30% of base_price
+
+  Politeness scoring (0.0 to 1.0):
+    polite request     → willing to offer 5-15%
+    enthusiastic/funny → bonus discount 10-20%
+    rude/demanding     → firm, minimal discount
+    sob story          → sympathetic but limited
+
+  Special modifiers:
+    bulk purchase → 5-15% extra
+    special occasion → 10-20% if convincing
+    loyalty (returning customer) → favorable terms
+
+  Negotiation style:
+    - Playful and engaging
+    - Start with small offer, can improve
+    - Create urgency ("this deal won't last!")
+    - Sometimes throw in a small freebie mention
+
+-----------------------------------------------
+6C. HAGGLE SESSION LIFECYCLE
+-----------------------------------------------
+
+  START: User asks for discount
+    → Create session (status: negotiating)
+    → initial_price = base_price
+
+  NEGOTIATE: Back and forth
+    → Update offered_price each round
+    → Track sentiment_score
+    → Agent adjusts offers based on history
+
+  ACCEPT: Deal reached
+    → status = accepted
+    → final_price = agreed price
+    → Generate unique discount_codes entry:
+        code: "HAGGLE-{random}"
+        discount_type: "fixed"
+        discount_value: base_price - final_price
+        usage_limit: 1
+        product_id: this product only
+    → Return discount code to user
+
+  REJECT: No deal
+    → status = rejected
+    → No discount code generated
+    → "Sorry, that's the best I can do!"
+
+================================================
+7. CHAT MEMORY SYSTEM
+================================================
+
+File: src/langchain/memory/chatMemory.ts
+
+The memory system provides conversation context so the
+agent remembers what was discussed.
+
+-----------------------------------------------
+7A. MEMORY ARCHITECTURE
+-----------------------------------------------
+
+  Storage: chat_sessions + chat_messages tables in Supabase
+
+  chat_sessions:
+    - id: UUID
+    - user_id: UUID (nullable for anonymous)
+    - session_id: string (browser session ID)
+    - started_at, ended_at
+    - metadata: JSONB
+
+  chat_messages:
+    - id: UUID
+    - chat_session_id: UUID
+    - role: 'user' | 'assistant' | 'system'
+    - content: TEXT
+    - function_calls: JSONB (array of tool invocations)
+    - created_at: TIMESTAMP
+
+-----------------------------------------------
+7B. MEMORY LOADING
+-----------------------------------------------
+
+  createChatMemory(sessionId):
+    1. Fetch last N messages from chat_messages
+       WHERE chat_session_id = sessionId
+       ORDER BY created_at ASC
+       LIMIT 20 (sliding window)
+    2. Convert to LangChain message format:
+       - role: "user" → HumanMessage(content)
+       - role: "assistant" → AIMessage(content)
+       - role: "system" → SystemMessage(content)
+    3. Return as chat_history array
+
+  This sliding window approach means:
+  - Recent context is always available
+  - Old messages are not lost (still in DB)
+  - Token usage stays bounded
+  - Agent can reference recent products / cart state
+
+-----------------------------------------------
+7C. MESSAGE PERSISTENCE
+-----------------------------------------------
+
+  After each agent turn:
+    1. Store user message:
+       INSERT INTO chat_messages (
+         chat_session_id, role: 'user', content
+       )
+    2. Store assistant response:
+       INSERT INTO chat_messages (
+         chat_session_id, role: 'assistant', content,
+         function_calls: [...tool_calls_made]
+       )
+
+  function_calls stores what tools the agent used:
+    [
+      { name: "search_products", args: { query: "beach bag" } },
+      { name: "add_to_cart", args: { product_id: "xxx" } }
+    ]
+
+  This is useful for:
+  - Debugging agent behavior
+  - Analytics (which tools are used most)
+  - Replaying conversations
+  - Admin can see what the AI did
+
+================================================
+8. FULL REQUEST FLOW (END TO END)
+================================================
+
+Here is the complete flow from user message to response:
+
+  ┌─────────────────────────────────────────────┐
+  │  FRONTEND (Chat UI)                         │
+  │  User types: "Find me something nice        │
+  │  for a beach vacation under $100"            │
+  └──────────────────┬──────────────────────────┘
+                     │
+                     ▼
+  ┌─────────────────────────────────────────────┐
+  │  POST /api/chat                              │
+  │  body: { message, session_id }              │
+  └──────────────────┬──────────────────────────┘
+                     │
+                     ▼
+  ┌─────────────────────────────────────────────┐
+  │  chatService.sendMessage()                   │
+  │  1. Get/create session                       │
+  │  2. Load chat_history (last 20 messages)     │
+  │  3. Store user message in DB                 │
+  └──────────────────┬──────────────────────────┘
+                     │
+                     ▼
+  ┌─────────────────────────────────────────────┐
+  │  CLERK AGENT (AgentExecutor)                │
+  │                                              │
+  │  System: CLERK_SYSTEM_PROMPT                 │
+  │  History: [prev messages...]                 │
+  │  Input: "Find me something nice for a        │
+  │          beach vacation under $100"           │
+  │                                              │
+  │  LLM REASONING:                              │
+  │  → "User wants beach items, under $100"      │
+  │  → "I should search semantically first"      │
+  │                                              │
+  │  TOOL CALL 1: search_products                │
+  │    { query: "beach vacation", limit: 5 }     │
+  │         │                                    │
+  │         ▼                                    │
+  │  ┌───────────────────────────────────┐       │
+  │  │  EMBEDDING SERVICE                │       │
+  │  │  "beach vacation" → vector[768]   │       │
+  │  └──────────────┬────────────────────┘       │
+  │                 ▼                            │
+  │  ┌───────────────────────────────────┐       │
+  │  │  PGVECTOR SIMILARITY SEARCH       │       │
+  │  │  query vector vs product vectors  │       │
+  │  │  → 5 matching product IDs         │       │
+  │  │  → similarity scores              │       │
+  │  └──────────────┬────────────────────┘       │
+  │                 ▼                            │
+  │  ┌───────────────────────────────────┐       │
+  │  │  PRODUCT ENRICHMENT               │       │
+  │  │  Fetch full product details       │       │
+  │  │  for matched IDs                  │       │
+  │  └──────────────┬────────────────────┘       │
+  │                 │                            │
+  │  ◄──────────────┘                            │
+  │                                              │
+  │  LLM sees 5 products, prices, stock          │
+  │  → Filters mentally: 3 are under $100        │
+  │  → Picks best 3 to recommend                 │
+  │                                              │
+  │  GENERATES RESPONSE:                         │
+  │  "Here are some perfect picks for your       │
+  │   beach getaway!                             │
+  │   1. Canvas Beach Tote - $39.99              │
+  │   2. Tropical Linen Shirt - $79.99           │
+  │   3. UV Protection Sunglasses - $45.00       │
+  │   Want me to add any of these to your cart?" │
+  └──────────────────┬──────────────────────────┘
+                     │
+                     ▼
+  ┌─────────────────────────────────────────────┐
+  │  chatService (continued)                     │
+  │  4. Store assistant message + tool calls     │
+  │  5. Return { message, actions }              │
+  └──────────────────┬──────────────────────────┘
+                     │
+                     ▼
+  ┌─────────────────────────────────────────────┐
+  │  FRONTEND RENDERS                            │
+  │  - Chat bubble with product cards            │
+  │  - "Add to Cart" buttons on each product     │
+  │  - User can click or type to continue        │
+  └─────────────────────────────────────────────┘
+
+================================================
+9. IMPLEMENTATION FILE MAP
+================================================
+
+Files that need implementation (currently stubs):
+
+PRIORITY 1 — CORE INFRASTRUCTURE:
+  src/langchain/config/geminiConfig.ts
+    → Implement createGeminiLLM()
+    → new ChatGoogleGenerativeAI(...)
+
+  src/langchain/embeddings/embeddingService.ts
+    → Implement generateEmbedding() and generateBatch()
+    → new GoogleGenerativeAIEmbeddings(...)
+
+  src/langchain/embeddings/vectorStore.ts
+    → Implement similaritySearch() via Supabase RPC
+    → Implement addDocuments()
+
+PRIORITY 2 — TOOLS:
+  src/langchain/tools/searchProductsTool.ts
+    → DynamicStructuredTool: embed query → vector search → enrich
+  src/langchain/tools/filterProductsTool.ts
+    → DynamicStructuredTool: Supabase query with filters
+  src/langchain/tools/checkStockTool.ts
+    → DynamicStructuredTool: query product_variants
+  src/langchain/tools/addToCartTool.ts
+    → DynamicStructuredTool: insert into cart_items
+  src/langchain/tools/applyDiscountTool.ts
+    → DynamicStructuredTool: validate + apply discount
+  src/langchain/tools/hagglePriceTool.ts
+    → DynamicStructuredTool: delegate to haggle service
+
+PRIORITY 3 — AGENTS + MEMORY:
+  src/langchain/memory/chatMemory.ts
+    → Load history from DB, return as LangChain messages
+  src/langchain/agents/clerkAgent.ts
+    → Wire up LLM + tools + prompt + executor
+  src/langchain/agents/haggleAgent.ts
+    → Wire up LLM + haggle prompt + negotiation logic
+
+PRIORITY 4 — CHAINS (optional, agents may suffice):
+  src/langchain/chains/ragChain.ts
+    → RetrievalQA chain (can be used inside search tool)
+  src/langchain/chains/conversationChain.ts
+    → If needed for non-tool conversations
+  src/langchain/chains/haggleChain.ts
+    → If haggle logic needs a dedicated chain
+
+PRIORITY 5 — SERVICE INTEGRATION:
+  src/features/chat/services/chatService.ts
+    → sendMessage(): session mgmt + agent execution + persistence
+    → getHistory(): fetch messages from DB
+  src/features/haggle/services/haggleService.ts
+    → negotiate(): create session + call haggle agent
+    → accept(): finalize deal + generate discount code
+
+PRIORITY 6 — RETRIEVER (optional, can use vectorStore directly):
+  src/langchain/retrievers/productRetriever.ts
+    → LangChain BaseRetriever wrapping vectorStore
+
+================================================
+10. DEPENDENCIES NEEDED
+================================================
+
+NPM packages to install:
+
+  @langchain/google-genai    — Gemini LLM + embeddings
+  @langchain/core            — Core LangChain types
+  langchain                  — Agent executor, tools, chains
+  zod                        — Schema validation for tools
+
+Already installed:
+  @supabase/supabase-js      — Database client
+  jose                       — JWT handling
+  next                       — Framework
+
+Environment variables needed:
+  GEMINI_API_KEY             — Google AI API key for Gemini
+
+================================================
+11. DATABASE FUNCTIONS USED BY RAG
+================================================
+
+These functions should already exist in Supabase
+(from schema.txt):
+
+A) search_products_by_embedding(
+     query_embedding vector(768),
+     match_threshold float DEFAULT 0.7,
+     match_count int DEFAULT 5
+   )
+   → Returns product_id, product_name, similarity
+   → Used by: searchProductsTool
+
+B) Tables used:
+   - product_embeddings  → vector storage + search
+   - products            → product data enrichment
+   - product_variants    → stock checking
+   - cart_items          → cart management
+   - discount_codes      → discount validation
+   - chat_sessions       → conversation sessions
+   - chat_messages       → message history
+   - haggle_sessions     → negotiation tracking
+   - categories          → product categories
+
+================================================
+12. RESPONSE FORMAT
+================================================
+
+The API returns a structured response that the frontend
+can use to render rich UI:
+
+  ChatResponse = {
+    message: {
+      id: string,
+      role: "assistant",
+      content: string,           // The text response
+      function_calls: [          // What tools were used
+        {
+          name: "search_products",
+          args: { query: "beach bag" },
+        },
+        {
+          name: "add_to_cart",
+          args: { product_id: "xxx" },
+        }
+      ],
+    },
+    actions: [                   // Frontend actions to execute
+      {
+        name: "show_products",
+        args: { products: [...] },
+      },
+      {
+        name: "update_cart",
+        args: { cart: {...} },
+      }
+    ],
+  }
+
+The frontend uses `actions` to:
+  - Render product cards in the chat
+  - Update cart badge / drawer
+  - Show haggle UI
+  - Display discount applied toast
+  - Navigate to checkout
+
+================================================
+END OF RAG SYSTEM WORKFLOW
+================================================
