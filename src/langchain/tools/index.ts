@@ -4,6 +4,8 @@ import { addToCartTool } from './addToCartTool';
 import { checkStockTool } from './checkStockTool';
 import { hagglePriceTool } from './hagglePriceTool';
 import { applyDiscountTool } from './applyDiscountTool';
+import { getUserActivityTool } from './getUserActivityTool';
+import { getRecommendationsTool } from './getRecommendationsTool';
 
 export const allTools = [
   searchProductsTool,
@@ -12,6 +14,8 @@ export const allTools = [
   checkStockTool,
   hagglePriceTool,
   applyDiscountTool,
+  getUserActivityTool,
+  getRecommendationsTool,
 ];
 
 export {
@@ -21,4 +25,6 @@ export {
   checkStockTool,
   hagglePriceTool,
   applyDiscountTool,
+  getUserActivityTool,
+  getRecommendationsTool,
 };

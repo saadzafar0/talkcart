@@ -2,11 +2,12 @@
 
 import { Suspense, useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { ProductGrid } from '@/features/products/components/ProductGrid';
 import { ProductFilters } from '@/features/products/components/ProductFilters';
 import { LoadingSpinner } from '@/core/components/common/LoadingSpinner';
 import { EmptyState } from '@/core/components/common/EmptyState';
+import { useCartStore } from '@/stores/useCartStore';
 import type { Product, ProductFilters as Filters } from '@/features/products/types';
 
 function ProductsContent() {
@@ -17,6 +18,7 @@ function ProductsContent() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [addingToCart, setAddingToCart] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
   const filters: Filters = {
     search: searchParams.get('search') || undefined,
@@ -30,6 +32,7 @@ function ProductsContent() {
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
       const params = new URLSearchParams();
       if (filters.search) params.set('search', filters.search);
@@ -45,9 +48,23 @@ function ProductsContent() {
         const data = await res.json();
         setProducts(data.data.products || []);
         setTotal(data.data.total || 0);
+
+        // Track search activity if there was a search term (fire and forget)
+        if (filters.search) {
+          fetch('/api/activity', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              activity_type: 'search',
+              metadata: { query: filters.search, results_count: data.data.total || 0 },
+            }),
+          }).catch(() => {});
+        }
+      } else {
+        setError('Failed to load products. Please try again.');
       }
     } catch {
-      // Silently handle
+      setError('Failed to load products. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -80,6 +97,8 @@ function ProductsContent() {
       if (!res.ok) {
         const data = await res.json();
         alert(data.error || 'Failed to add to cart');
+      } else {
+        useCartStore.getState().fetchCount();
       }
     } catch {
       alert('Failed to add to cart');
@@ -101,6 +120,13 @@ function ProductsContent() {
       </div>
 
       <ProductFilters filters={filters} onFiltersChange={handleFiltersChange} />
+
+      {error && (
+        <div className="mt-4 flex items-center gap-2 rounded-lg border border-error-500/30 bg-error-500/10 px-4 py-3 text-sm text-error-600">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error}
+        </div>
+      )}
 
       <div className="mt-8">
         {loading ? (

@@ -14,8 +14,9 @@ export async function GET(req: NextRequest) {
     const history = await chatService.getHistory(sessionId);
 
     return successResponse({ messages: history });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Chat history API error:', error);
-    return errorResponse(error.message || 'Failed to fetch chat history', 500);
+    const message = error instanceof Error ? error.message : 'Failed to fetch chat history';
+    return errorResponse(message, 500);
   }
 }

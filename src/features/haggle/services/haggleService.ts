@@ -99,8 +99,9 @@ export const haggleService = {
 
     let discountCode: DiscountCode | undefined;
 
-    if (agentResult.accepted) {
-      // Deal accepted — generate discount code
+    if (agentResult.offeredPrice < product.base_price) {
+      // Agent offered a discount — generate coupon code immediately
+      // Per PRD: good reason → Clerk generates a unique Coupon Code
       const code = generateDiscountCode();
       const discountValue = product.base_price - agentResult.offeredPrice;
 
@@ -125,6 +126,10 @@ export const haggleService = {
         updateData.final_price = agentResult.offeredPrice;
         updateData.discount_code_id = createdDiscount.id;
       }
+    } else if (agentResult.accepted) {
+      // Edge case: agent accepted but didn't lower price
+      updateData.status = 'accepted';
+      updateData.final_price = agentResult.offeredPrice;
     }
 
     // Update the session

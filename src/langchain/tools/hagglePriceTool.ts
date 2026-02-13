@@ -5,9 +5,9 @@ import { haggleService } from '@/features/haggle/services/haggleService';
 export const hagglePriceTool = new DynamicStructuredTool({
   name: 'haggle_price',
   description:
-    'Negotiate a discount on a product based on user reasoning. Use this when the customer asks for a deal, discount, or better price on a specific product.',
+    'Negotiate a discount on a product based on user reasoning. Use when the customer asks for a deal, discount, or better price. The product_id comes from your recent search results - use the ID of the product they\'re interested in.',
   schema: z.object({
-    product_id: z.string().describe('The UUID of the product to negotiate on'),
+    product_id: z.string().describe('The UUID of the product to negotiate on (from your search results)'),
     message: z.string().describe("The user's haggle message or reason for discount"),
     session_id: z.string().optional().describe('Existing haggle session ID to continue negotiation'),
     user_id: z.string().optional().describe('The user ID if authenticated'),
@@ -34,6 +34,7 @@ export const hagglePriceTool = new DynamicStructuredTool({
               code: response.discount_code.code,
               discount_type: response.discount_code.discount_type,
               discount_value: response.discount_code.discount_value,
+              instruction: `IMPORTANT: Tell the customer their coupon code is "${response.discount_code.code}" for $${response.discount_code.discount_value} off. They can use it at checkout. It expires in 24 hours.`,
             }
           : null,
       });

@@ -19,7 +19,7 @@ export function ProductFilters({ filters, onFiltersChange }: ProductFiltersProps
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const res = await fetch('/api/admin/categories');
+        const res = await fetch('/api/categories');
         if (res.ok) {
           const data = await res.json();
           setCategories(data.data || []);

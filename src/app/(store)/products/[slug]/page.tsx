@@ -21,6 +21,7 @@ import { ProductCard } from '@/features/products/components/ProductCard';
 import { HaggleDialog } from '@/features/haggle/components/HaggleDialog';
 import { LoadingSpinner } from '@/core/components/common/LoadingSpinner';
 import { formatPrice, formatRating } from '@/core/utils/formatters';
+import { useCartStore } from '@/stores/useCartStore';
 import type { Product, ProductVariant } from '@/features/products/types';
 
 interface Review {
@@ -58,7 +59,7 @@ export default function ProductDetailPage() {
           `/api/products/${slug}?includeVariants=true&includeReviews=true&includeRelated=true`
         );
         if (!res.ok) {
-          router.push('/products');
+          setError('Product not found.');
           return;
         }
         const data = await res.json();
@@ -67,6 +68,18 @@ export default function ProductDetailPage() {
         setProduct(payload.product);
         setVariants(payload.variants || []);
         setReviews(payload.reviews || []);
+
+        // Track product view (fire and forget)
+        if (payload.product?.id) {
+          fetch('/api/activity', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              activity_type: 'view_product',
+              product_id: payload.product.id,
+            }),
+          }).catch(() => {});
+        }
 
         // Fetch related products by category
         if (payload.product?.category_id) {
@@ -82,11 +95,11 @@ export default function ProductDetailPage() {
               setRelatedProducts(related.slice(0, 4));
             }
           } catch {
-            // Silently handle related products failure
+            // Related products are non-critical — skip silently
           }
         }
       } catch {
-        router.push('/products');
+        setError('Failed to load product. Please check your connection.');
       } finally {
         setLoading(false);
       }
@@ -117,6 +130,19 @@ export default function ProductDetailPage() {
         return;
       }
 
+      useCartStore.getState().fetchCount();
+
+      // Track add to cart (fire and forget)
+      fetch('/api/activity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          activity_type: 'add_to_cart',
+          product_id: product.id,
+          metadata: { quantity, variant_id: selectedVariant },
+        }),
+      }).catch(() => {});
+
       setAddedToCart(true);
       setTimeout(() => setAddedToCart(false), 3000);
     } catch {
@@ -134,7 +160,27 @@ export default function ProductDetailPage() {
     );
   }
 
-  if (!product) return null;
+  if (!product) {
+    return (
+      <div className="mx-auto max-w-7xl px-6 py-8">
+        <div className="mb-6">
+          <Link
+            href="/products"
+            className="inline-flex items-center gap-1 text-sm text-primary-500 transition-colors hover:text-accent-700"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Products
+          </Link>
+        </div>
+        {error && (
+          <div className="flex items-center gap-2 rounded-lg border border-error-500/30 bg-error-500/10 px-4 py-3 text-sm text-error-600">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {error}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const inStock = product.stock_quantity > 0;
   const images = [product.image_url, ...(product.images || [])].filter(Boolean) as string[];

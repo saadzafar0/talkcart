@@ -37,8 +37,19 @@ export interface OrderWithItems extends Order {
   items: OrderItem[];
 }
 
+export interface ShippingAddress {
+  full_name: string;
+  phone: string;
+  address_line1: string;
+  address_line2?: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country: string;
+}
+
 export interface CreateOrderRequest {
-  shipping_address_id: string;
+  shipping_address: ShippingAddress;
   shipping_method: string;
   payment_method: string;
   discount_code?: string;

@@ -14,6 +14,7 @@ import {
   Menu,
   X,
 } from 'lucide-react';
+import { useChatStore } from '@/stores/useChatStore';
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -26,6 +27,7 @@ const navItems = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const clearChat = useChatStore((s) => s.clearChat);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState<{ full_name: string | null; role: string } | null>(null);
 
@@ -44,6 +46,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
+    clearChat(); // Clear chat history on logout
     router.push('/login');
   };
 

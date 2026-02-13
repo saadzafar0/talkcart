@@ -1,4 +1,4 @@
-import { SendMessageRequest, ChatResponse, ChatMessage, ChatSession } from '../types';
+import { SendMessageRequest, ChatResponse, ChatMessage, ChatSession, FunctionCall } from '../types';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { clerkAgent } from '@/langchain/agents/clerkAgent';
 import { createChatMemory } from '@/langchain/memory/chatMemory';
@@ -73,16 +73,28 @@ export const chatService = {
     const supabase = createServerSupabase();
 
     // If session_id provided, try to get existing session
+    // SECURITY: Verify session belongs to current user
     if (sessionId) {
-      const { data: existingSession } = await supabase
+      let query = supabase
         .from('chat_sessions')
         .select('*')
-        .eq('id', sessionId)
-        .single();
+        .eq('id', sessionId);
+
+      // If user is logged in, verify session belongs to them
+      if (userId) {
+        query = query.eq('user_id', userId);
+      } else {
+        // If user is anonymous, verify session is also anonymous
+        query = query.is('user_id', null);
+      }
+
+      const { data: existingSession } = await query.single();
 
       if (existingSession) {
         return existingSession;
       }
+      
+      // Session doesn't exist or doesn't belong to user - create new one
     }
 
     // If user_id provided, try to get their latest active session
@@ -126,7 +138,7 @@ export const chatService = {
     sessionId: string,
     role: 'user' | 'assistant' | 'system',
     content: string,
-    functionCalls?: any
+    functionCalls?: FunctionCall[] | null
   ): Promise<ChatMessage> {
     const supabase = createServerSupabase();
 

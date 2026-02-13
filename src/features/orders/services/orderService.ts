@@ -81,7 +81,26 @@ export const orderService = {
       );
     }
 
-    // 3. Calculate totals
+    // 3. Save shipping address (address fields only)
+    const { data: savedAddress, error: addressError } = await supabase
+      .from('user_addresses')
+      .insert({
+        user_id: userId,
+        address_line1: data.shipping_address.address_line1,
+        address_line2: data.shipping_address.address_line2 || null,
+        city: data.shipping_address.city,
+        state: data.shipping_address.state,
+        postal_code: data.shipping_address.postal_code,
+        country: data.shipping_address.country,
+      })
+      .select('id')
+      .single();
+
+    if (addressError || !savedAddress) {
+      throw new Error(addressError?.message || 'Failed to save shipping address');
+    }
+
+    // 4. Calculate totals
     const subtotal = cart.subtotal;
     const taxRate = 0.08;
     const taxableAmount = subtotal - discountAmount;
@@ -90,10 +109,19 @@ export const orderService = {
     const totalAmount =
       Math.round((taxableAmount + taxAmount + shippingAmount) * 100) / 100;
 
-    // 4. Generate order number
+    // 5. Generate order number
     const orderNumber = generateOrderNumber();
 
-    // 5. Insert order
+    // Store shipping contact info in notes as structured data
+    const shippingContact = {
+      full_name: data.shipping_address.full_name,
+      phone: data.shipping_address.phone,
+    };
+    const orderNotes = data.notes 
+      ? `Contact: ${JSON.stringify(shippingContact)}\nNotes: ${data.notes}`
+      : `Contact: ${JSON.stringify(shippingContact)}`;
+
+    // 6. Insert order
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
@@ -106,11 +134,11 @@ export const orderService = {
         shipping_amount: shippingAmount,
         total_amount: totalAmount,
         discount_code_id: discountCodeId,
-        shipping_address_id: data.shipping_address_id,
+        shipping_address_id: savedAddress.id,
         shipping_method: data.shipping_method,
         payment_method: data.payment_method,
         payment_status: 'pending',
-        notes: data.notes || null,
+        notes: orderNotes,
       })
       .select('*')
       .single();
@@ -119,7 +147,7 @@ export const orderService = {
       throw new Error(orderError?.message || 'Failed to create order');
     }
 
-    // 6. Insert order items (snapshot product names and prices from cart)
+    // 7. Insert order items (snapshot product names and prices from cart)
     const orderItems = cart.items.map((item) => ({
       order_id: order.id,
       product_id: item.product_id,
@@ -139,7 +167,7 @@ export const orderService = {
       console.error('Failed to insert order items:', itemsError.message);
     }
 
-    // 7. Increment discount code usage
+    // 8. Increment discount code usage
     if (discountCodeId) {
       const { data: currentDiscount } = await supabase
         .from('discount_codes')
@@ -155,7 +183,7 @@ export const orderService = {
       }
     }
 
-    // 8. Clear the cart
+    // 9. Clear the cart
     await cartService.clearCart(userId);
 
     return {
@@ -183,7 +211,7 @@ export const orderService = {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const orderData = order as any;
+    const orderData = order as Record<string, any>;
 
     return {
       ...orderData,
@@ -205,7 +233,7 @@ export const orderService = {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (orders || []).map((order: any) => ({
+    return (orders || []).map((order: Record<string, any>) => ({
       ...order,
       items: order.order_items || [],
     })) as OrderWithItems[];

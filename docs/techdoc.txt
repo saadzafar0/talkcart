@@ -2,8 +2,6 @@ Frontend:
 Next.js 14+ (App Router) - Your main framework
 Styling
 Tailwind CSS - Fast, professional-looking UI
-shadcn/ui - Pre-built components (saves hours)
-Framer Motion - Smooth animations when UI updates from chat
 
 Design should be professional and follow the given below color scheme:
 

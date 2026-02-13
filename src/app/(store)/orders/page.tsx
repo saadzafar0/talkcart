@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Package, ChevronRight, Clock } from 'lucide-react';
+import { Package, ChevronRight, Clock, AlertCircle } from 'lucide-react';
 import { LoadingSpinner } from '@/core/components/common/LoadingSpinner';
 import { EmptyState } from '@/core/components/common/EmptyState';
 import { formatPrice, formatDateShort } from '@/core/utils/formatters';
@@ -22,6 +22,7 @@ export default function OrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     async function fetchOrders() {
@@ -32,9 +33,11 @@ export default function OrdersPage() {
           setOrders(data.data || []);
         } else if (res.status === 401) {
           router.push('/login');
+        } else {
+          setError('Failed to load orders. Please try again.');
         }
       } catch {
-        // Silently handle
+        setError('Failed to load orders. Please check your connection.');
       } finally {
         setLoading(false);
       }
@@ -74,6 +77,13 @@ export default function OrdersPage() {
   return (
     <div className="mx-auto max-w-7xl px-6 py-8">
       <h1 className="mb-8 text-3xl font-bold text-primary-900">My Orders</h1>
+
+      {error && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-error-500/30 bg-error-500/10 px-4 py-3 text-sm text-error-600">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error}
+        </div>
+      )}
 
       <div className="space-y-4">
         {orders.map((order) => (

@@ -11,6 +11,7 @@ import {
   Clock,
   CheckCircle,
   XCircle,
+  AlertCircle,
 } from 'lucide-react';
 import { LoadingSpinner } from '@/core/components/common/LoadingSpinner';
 import { formatPrice, formatDate } from '@/core/utils/formatters';
@@ -40,6 +41,7 @@ export default function OrderDetailPage() {
 
   const [order, setOrder] = useState<OrderWithItems | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     async function fetchOrder() {
@@ -50,11 +52,13 @@ export default function OrderDetailPage() {
           setOrder(data.data);
         } else if (res.status === 401) {
           router.push('/login');
+        } else if (res.status === 404) {
+          setError('Order not found.');
         } else {
-          router.push('/orders');
+          setError('Failed to load order details.');
         }
       } catch {
-        router.push('/orders');
+        setError('Failed to load order details. Please check your connection.');
       } finally {
         setLoading(false);
       }
@@ -70,7 +74,27 @@ export default function OrderDetailPage() {
     );
   }
 
-  if (!order) return null;
+  if (!order) {
+    return (
+      <div className="mx-auto max-w-4xl px-6 py-8">
+        <div className="mb-6">
+          <Link
+            href="/orders"
+            className="inline-flex items-center gap-1 text-sm text-primary-500 transition-colors hover:text-accent-700"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Orders
+          </Link>
+        </div>
+        {error && (
+          <div className="flex items-center gap-2 rounded-lg border border-error-500/30 bg-error-500/10 px-4 py-3 text-sm text-error-600">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {error}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
