@@ -35,14 +35,14 @@ export const authService = {
         full_name: data.full_name || null,
         phone: data.phone || null,
       })
-      .select('id, email, full_name, phone, created_at')
+      .select('id, email, full_name, phone, role, created_at')
       .single();
 
     if (error || !user) {
       throw new AppError('Failed to create user', 500);
     }
 
-    const token = await signToken({ userId: user.id, email: user.email });
+    const token = await signToken({ userId: user.id, email: user.email, role: user.role });
 
     return { user, token };
   },
@@ -57,7 +57,7 @@ export const authService = {
 
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, full_name, phone, password_hash, created_at')
+      .select('id, email, full_name, phone, role, password_hash, created_at')
       .eq('email', data.email)
       .single();
 
@@ -70,7 +70,7 @@ export const authService = {
       throw new AppError('Invalid email or password', 401);
     }
 
-    const token = await signToken({ userId: user.id, email: user.email });
+    const token = await signToken({ userId: user.id, email: user.email, role: user.role });
 
     const { password_hash: _, ...userWithoutPassword } = user;
 
@@ -82,7 +82,7 @@ export const authService = {
 
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, full_name, phone, created_at')
+      .select('id, email, full_name, phone, role, created_at')
       .eq('id', userId)
       .single();
 

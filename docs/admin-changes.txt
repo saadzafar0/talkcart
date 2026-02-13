@@ -1,0 +1,511 @@
+================================================
+TALKCHART - ADMIN & SELLER CHANGES
+================================================
+
+This document covers all additions and changes needed to
+support the Admin/Seller role. The Admin is the single
+store owner who manages products, orders, discounts,
+and the AI clerk configuration.
+
+================================================
+1. SCHEMA CHANGES
+================================================
+
+The only table change is adding a `role` column to
+the existing `users` table. No new tables needed.
+
+-- Add role to users table
+ALTER TABLE users
+ADD COLUMN role VARCHAR(20) DEFAULT 'customer'
+CHECK (role IN ('customer', 'admin'));
+
+-- Seed the admin user (run once after schema update)
+-- The admin registers normally, then you promote them:
+UPDATE users SET role = 'admin' WHERE email = 'your-admin@email.com';
+
+Why just a column, not a whole roles/permissions table:
+- Single store, single admin
+- Only two roles: customer and admin
+- No need for complex RBAC
+
+================================================
+2. AUTH CHANGES
+================================================
+
+What changes in the existing auth system:
+
+A) JWT payload now includes role:
+   BEFORE: { userId, email }
+   AFTER:  { userId, email, role }
+
+B) New middleware: withAdmin
+   Same as withAuth but also checks user.role === 'admin'
+   Returns 403 Forbidden if not admin
+
+Files to update:
+- src/lib/auth/jwt.ts        → Add `role` to JwtPayload
+- src/lib/auth/middleware.ts  → Add withAdmin function
+- src/features/auth/services/authService.ts
+    → Include role in login/register queries
+    → Include role in JWT signing
+- src/features/auth/types/index.ts
+    → Add role to User type
+
+================================================
+3. NEW FEATURE MODULE: admin
+================================================
+
+src/features/admin/
+├── index.ts
+├── types/
+│   └── index.ts
+├── services/
+│   ├── productAdminService.ts    # CRUD products + auto-embed
+│   ├── orderAdminService.ts      # View/update all orders
+│   ├── categoryAdminService.ts   # CRUD categories
+│   ├── discountAdminService.ts   # CRUD discount codes
+│   └── analyticsService.ts       # Sales stats, top products
+└── utils/
+    ├── slugGenerator.ts          # Generate URL slugs from names
+    └── embedProduct.ts           # Build text + call embedding API
+
+-----------------------------------------------
+3A. TYPES (src/features/admin/types/index.ts)
+-----------------------------------------------
+
+AdminDashboardStats {
+  total_revenue: number
+  total_orders: number
+  total_customers: number
+  total_products: number
+  orders_today: number
+  revenue_today: number
+}
+
+CreateProductRequest {
+  name: string
+  description: string
+  category_id: string
+  base_price: number
+  minimum_price: number       # Haggle floor
+  cost_price: number          # Your cost
+  image_url?: string
+  images?: string[]
+  stock_quantity: number
+  metadata?: Record<string, unknown>
+}
+
+UpdateProductRequest = Partial<CreateProductRequest> & { is_active?: boolean }
+
+CreateVariantRequest {
+  product_id: string
+  sku: string
+  color?: string
+  size?: string
+  stock_quantity: number
+  price_adjustment?: number
+  image_url?: string
+}
+
+CreateDiscountRequest {
+  code: string
+  discount_type: 'percentage' | 'fixed'
+  discount_value: number
+  product_id?: string
+  min_purchase_amount?: number
+  max_discount_amount?: number
+  usage_limit?: number
+  expires_at?: string
+}
+
+OrderUpdateRequest {
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+  payment_status?: 'pending' | 'paid' | 'failed' | 'refunded'
+}
+
+-----------------------------------------------
+3B. PRODUCT ADMIN SERVICE
+-----------------------------------------------
+
+productAdminService:
+
+  create(data: CreateProductRequest):
+    1. Generate slug from name
+    2. Insert into products table
+    3. Auto-generate embedding:
+       a. Build text: "{name}. {description}. Category: {category}.
+          {metadata key-value pairs}. Price: ${base_price}"
+       b. Call Gemini embedding API → 768-dim vector
+       c. Insert into product_embeddings (product_id, embedding, content)
+    4. Return created product
+
+  update(productId, data: UpdateProductRequest):
+    1. Update product in products table
+    2. If name, description, or metadata changed:
+       a. Re-generate embedding (same process as create step 3)
+       b. Upsert into product_embeddings
+    3. Return updated product
+
+  delete(productId):
+    1. Delete from products table
+    2. product_embeddings auto-deleted (ON DELETE CASCADE)
+
+  getAll(filters):
+    - Returns ALL products (including inactive) for admin view
+    - Supports pagination
+
+  createVariant(data: CreateVariantRequest):
+    - Insert into product_variants
+
+  updateVariant(variantId, data):
+    - Update product_variants
+
+  deleteVariant(variantId):
+    - Delete from product_variants
+
+  reembedAll():
+    - Loop through all active products
+    - Regenerate all embeddings
+    - Useful after changing embedding model or text format
+
+-----------------------------------------------
+3C. ORDER ADMIN SERVICE
+-----------------------------------------------
+
+orderAdminService:
+
+  getAll(filters):
+    - All orders across all users
+    - Filter by status, date range, payment_status
+    - Paginated
+
+  getById(orderId):
+    - Single order with items, user info, address
+
+  updateStatus(orderId, data: OrderUpdateRequest):
+    - Update order status and/or payment_status
+
+-----------------------------------------------
+3D. CATEGORY ADMIN SERVICE
+-----------------------------------------------
+
+categoryAdminService:
+
+  getAll():
+    - All categories
+
+  create(name, description?):
+    - Generate slug, insert
+
+  update(categoryId, name?, description?):
+    - Update category
+
+  delete(categoryId):
+    - Delete category (products become uncategorized)
+
+-----------------------------------------------
+3E. DISCOUNT ADMIN SERVICE
+-----------------------------------------------
+
+discountAdminService:
+
+  getAll():
+    - All discount codes with usage stats
+
+  create(data: CreateDiscountRequest):
+    - Insert discount code
+
+  update(discountId, data):
+    - Update discount code
+
+  deactivate(discountId):
+    - Set is_active = false
+
+-----------------------------------------------
+3F. ANALYTICS SERVICE
+-----------------------------------------------
+
+analyticsService:
+
+  getDashboardStats():
+    - Total revenue (SUM of orders.total_amount WHERE paid)
+    - Total orders count
+    - Total customers count
+    - Total active products
+    - Today's orders and revenue
+
+  getTopProducts(limit):
+    - Most ordered products (by quantity)
+
+  getRecentOrders(limit):
+    - Latest orders with user info
+
+  getRevenueByDay(days):
+    - Revenue per day for chart display
+
+  getHaggleStats():
+    - Total haggle sessions
+    - Acceptance rate
+    - Average discount given
+
+================================================
+4. NEW API ROUTES
+================================================
+
+All admin routes are protected with withAdmin middleware.
+
+src/app/api/admin/
+├── dashboard/
+│   └── route.ts              # GET  /api/admin/dashboard
+│                              #   → analyticsService.getDashboardStats()
+│
+├── products/
+│   ├── route.ts              # GET  /api/admin/products (list all)
+│   │                         # POST /api/admin/products (create + auto-embed)
+│   ├── [id]/
+│   │   └── route.ts          # GET    /api/admin/products/:id
+│   │                         # PATCH  /api/admin/products/:id (update + re-embed)
+│   │                         # DELETE /api/admin/products/:id
+│   └── [id]/variants/
+│       └── route.ts          # GET  /api/admin/products/:id/variants
+│                              # POST /api/admin/products/:id/variants
+│
+├── orders/
+│   ├── route.ts              # GET /api/admin/orders (list all)
+│   └── [id]/
+│       └── route.ts          # GET   /api/admin/orders/:id
+│                              # PATCH /api/admin/orders/:id (update status)
+│
+├── categories/
+│   └── route.ts              # GET  /api/admin/categories
+│                              # POST /api/admin/categories
+│
+├── discounts/
+│   ├── route.ts              # GET  /api/admin/discounts
+│   │                         # POST /api/admin/discounts
+│   └── [id]/
+│       └── route.ts          # PATCH  /api/admin/discounts/:id
+│                              # DELETE /api/admin/discounts/:id
+│
+├── embed/
+│   └── route.ts              # POST /api/admin/embed
+│                              #   body: { productId } → embed one product
+│                              #   body: { all: true } → re-embed all products
+│
+└── analytics/
+    └── route.ts              # GET /api/admin/analytics?type=revenue_by_day&days=30
+                               #   → getTopProducts, getRevenueByDay, etc.
+
+================================================
+5. ADMIN PAGES
+================================================
+
+src/app/admin/
+├── layout.tsx                  # Admin layout with sidebar nav
+├── page.tsx                    # Dashboard (stats, charts, recent orders)
+│
+├── products/
+│   ├── page.tsx                # Product list table (all products)
+│   ├── new/
+│   │   └── page.tsx            # Create product form
+│   └── [id]/
+│       └── edit/
+│           └── page.tsx        # Edit product form + manage variants
+│
+├── orders/
+│   ├── page.tsx                # All orders table
+│   └── [id]/
+│       └── page.tsx            # Order detail + update status
+│
+├── categories/
+│   └── page.tsx                # Category management
+│
+└── discounts/
+    └── page.tsx                # Discount code management
+
+-----------------------------------------------
+ADMIN LAYOUT
+-----------------------------------------------
+
+Sidebar navigation (always visible):
+┌──────────────┬────────────────────────────────────┐
+│              │                                    │
+│  TalkChart   │   [Page Content]                   │
+│  ADMIN       │                                    │
+│              │                                    │
+│  Dashboard   │                                    │
+│  Products    │                                    │
+│  Orders      │                                    │
+│  Categories  │                                    │
+│  Discounts   │                                    │
+│              │                                    │
+│  ──────────  │                                    │
+│  View Store  │                                    │
+│  Logout      │                                    │
+│              │                                    │
+└──────────────┴────────────────────────────────────┘
+
+Uses the same color scheme:
+- Sidebar: bg-primary-900 (charcoal)
+- Active item: accent-600 (gold) left border
+- Content area: bg-neutral-50 (eggshell)
+
+-----------------------------------------------
+ADMIN DASHBOARD PAGE
+-----------------------------------------------
+
+Shows at a glance:
+┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+│ Revenue │ │ Orders  │ │ Custo-  │ │ Prod-   │
+│ $12,450 │ │    47   │ │ mers    │ │ ucts    │
+│ +12%    │ │ +5 today│ │   128   │ │    24   │
+└─────────┘ └─────────┘ └─────────┘ └─────────┘
+
+[Revenue Chart - last 30 days]
+
+Recent Orders           Top Products
+┌──────────────────┐   ┌──────────────────┐
+│ #ORD-001 $299    │   │ Linen Suit  x23  │
+│ #ORD-002 $89     │   │ Sunglasses  x18  │
+│ #ORD-003 $450    │   │ Sneakers    x15  │
+└──────────────────┘   └──────────────────┘
+
+Haggle Stats
+- 34 negotiations | 68% accepted | Avg 12% discount
+
+================================================
+6. AUTO-EMBEDDING FLOW
+================================================
+
+When admin creates or edits a product:
+
+ADMIN CREATES PRODUCT
+    |
+    v
+POST /api/admin/products
+    |
+    v
+productAdminService.create()
+    |
+    ├── 1. Validate input
+    ├── 2. Generate slug: "Italian Linen Summer Suit" → "italian-linen-summer-suit"
+    ├── 3. Insert into `products` table
+    ├── 4. Build embedding text:
+    │       "Italian Linen Summer Suit.
+    │        Perfect for weddings in Tuscany.
+    │        Category: Fashion.
+    │        Material: 100% Italian Linen.
+    │        Occasion: formal. Season: summer. Fit: slim.
+    │        Price: $299.99"
+    ├── 5. Call embeddingService.generateEmbedding(text) → 768-dim vector
+    ├── 6. Insert into `product_embeddings` (product_id, embedding, content)
+    └── 7. Return created product
+    |
+    v
+PRODUCT IS IMMEDIATELY SEARCHABLE VIA RAG
+
+When admin EDITS a product (name, description, or metadata):
+    Same flow but step 6 becomes UPSERT (delete old + insert new)
+
+When admin DELETES a product:
+    ON DELETE CASCADE handles the embedding row automatically
+
+Re-embed all (after model change or text format change):
+    POST /api/admin/embed { all: true }
+    → Loops all active products
+    → Regenerates all embeddings
+    → Logs progress
+
+================================================
+7. MIDDLEWARE CHANGES
+================================================
+
+New withAdmin middleware in src/lib/auth/middleware.ts:
+
+withAdmin wraps an API route handler:
+1. Reads auth cookie
+2. Verifies JWT
+3. Checks payload.role === 'admin'
+4. If not admin → 403 Forbidden
+5. If admin → passes to handler with user context
+
+Usage in routes:
+  export const GET = withAdmin(async (req, { user }) => { ... });
+  export const POST = withAdmin(async (req, { user }) => { ... });
+
+================================================
+8. FULL FILE LIST (NEW FILES ONLY)
+================================================
+
+New files to create:
+
+FEATURE MODULE:
+  src/features/admin/index.ts
+  src/features/admin/types/index.ts
+  src/features/admin/services/productAdminService.ts
+  src/features/admin/services/orderAdminService.ts
+  src/features/admin/services/categoryAdminService.ts
+  src/features/admin/services/discountAdminService.ts
+  src/features/admin/services/analyticsService.ts
+  src/features/admin/utils/slugGenerator.ts
+  src/features/admin/utils/embedProduct.ts
+
+API ROUTES:
+  src/app/api/admin/dashboard/route.ts
+  src/app/api/admin/products/route.ts
+  src/app/api/admin/products/[id]/route.ts
+  src/app/api/admin/products/[id]/variants/route.ts
+  src/app/api/admin/orders/route.ts
+  src/app/api/admin/orders/[id]/route.ts
+  src/app/api/admin/categories/route.ts
+  src/app/api/admin/discounts/route.ts
+  src/app/api/admin/discounts/[id]/route.ts
+  src/app/api/admin/embed/route.ts
+  src/app/api/admin/analytics/route.ts
+
+PAGES:
+  src/app/admin/layout.tsx
+  src/app/admin/page.tsx
+  src/app/admin/products/page.tsx
+  src/app/admin/products/new/page.tsx
+  src/app/admin/products/[id]/edit/page.tsx
+  src/app/admin/orders/page.tsx
+  src/app/admin/orders/[id]/page.tsx
+  src/app/admin/categories/page.tsx
+  src/app/admin/discounts/page.tsx
+
+FILES TO UPDATE (existing):
+  src/lib/auth/jwt.ts              → Add role to JwtPayload
+  src/lib/auth/middleware.ts       → Add withAdmin
+  src/features/auth/types/index.ts → Add role to User
+  src/features/auth/services/authService.ts → Include role in queries
+
+TOTAL: 20 new files + 4 files to update
+
+================================================
+9. ADMIN ROUTE PROTECTION SUMMARY
+================================================
+
+Public routes (no auth):
+  GET  /api/products
+  GET  /api/products/:slug
+  POST /api/products/search
+  POST /api/chat
+  GET  /api/chat/history
+  POST /api/haggle
+  POST /api/haggle/accept
+
+Customer routes (withAuth):
+  GET  /api/cart
+  POST /api/cart/add
+  DELETE /api/cart/remove/:itemId
+  POST /api/orders
+  GET  /api/orders/:id
+  GET  /api/auth/me
+
+Admin routes (withAdmin):
+  ALL /api/admin/*
+
+================================================
+END OF ADMIN CHANGES DOCUMENT
+================================================
