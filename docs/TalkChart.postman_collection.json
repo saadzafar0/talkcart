@@ -1,0 +1,717 @@
+{
+  "info": {
+    "name": "TalkChart API",
+    "description": "Complete API collection for TalkChart - AI Personal Shopper",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"phone\": \"+1234567890\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Register a new user. Sets httpOnly auth cookie on success."
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login with email and password. Sets httpOnly auth cookie on success."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout"]
+            },
+            "description": "Clears the auth cookie."
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Get the currently authenticated user's profile. Requires auth cookie."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products (Public)",
+      "item": [
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?page=1&limit=20&sortBy=newest",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "sortBy", "value": "newest", "description": "price_asc | price_desc | rating | newest" },
+                { "key": "category", "value": "", "disabled": true, "description": "Category slug" },
+                { "key": "minPrice", "value": "", "disabled": true },
+                { "key": "maxPrice", "value": "", "disabled": true },
+                { "key": "search", "value": "", "disabled": true, "description": "Basic text search" }
+              ]
+            },
+            "description": "Get paginated list of active products with optional filters and sorting. No auth required."
+          }
+        },
+        {
+          "name": "Get Product by Slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/:slug?includeVariants=true&includeReviews=true&includeRelated=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", ":slug"],
+              "query": [
+                { "key": "includeVariants", "value": "true" },
+                { "key": "includeReviews", "value": "true" },
+                { "key": "includeRelated", "value": "false" }
+              ],
+              "variable": [
+                { "key": "slug", "value": "italian-linen-summer-suit" }
+              ]
+            },
+            "description": "Get a single product by slug with optional variants, reviews, and related products. No auth required."
+          }
+        },
+        {
+          "name": "Semantic Search (RAG)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"summer wedding outfit\",\n  \"limit\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/products/search",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "search"]
+            },
+            "description": "RAG-based semantic search using vector embeddings. Falls back to text search if embeddings unavailable. No auth required."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "item": [
+        {
+          "name": "Get Cart",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cart",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cart"]
+            },
+            "description": "Get the current user's cart with items, subtotal, and item count. Requires auth cookie."
+          }
+        },
+        {
+          "name": "Add Item to Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"<product-uuid>\",\n  \"variant_id\": null,\n  \"quantity\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cart/add",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cart", "add"]
+            },
+            "description": "Add a product to the cart. Validates product is active and in stock. Increments quantity if same item exists. Requires auth cookie."
+          }
+        },
+        {
+          "name": "Update Item Quantity",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"item_id\": \"<cart-item-uuid>\",\n  \"quantity\": 2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cart",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cart"]
+            },
+            "description": "Update the quantity of a cart item. Validates stock availability. Requires auth cookie."
+          }
+        },
+        {
+          "name": "Remove Item from Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cart/remove/:itemId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cart", "remove", ":itemId"],
+              "variable": [
+                { "key": "itemId", "value": "<cart-item-uuid>" }
+              ]
+            },
+            "description": "Remove a specific item from the cart. Requires auth cookie."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "List My Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"]
+            },
+            "description": "Get all orders for the authenticated user, newest first. Requires auth cookie."
+          }
+        },
+        {
+          "name": "Create Order from Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shipping_address_id\": \"<address-uuid>\",\n  \"shipping_method\": \"standard\",\n  \"payment_method\": \"card\",\n  \"discount_code\": null,\n  \"notes\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"]
+            },
+            "description": "Create a new order from the user's cart. Validates discount code, calculates totals (subtotal - discount + 8% tax + shipping), clears cart. shipping_method: 'standard' ($5) or 'express' ($15). Requires auth cookie."
+          }
+        },
+        {
+          "name": "Get Order by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", ":id"],
+              "variable": [
+                { "key": "id", "value": "<order-uuid>" }
+              ]
+            },
+            "description": "Get a specific order with its items. Only returns orders owned by the authenticated user. Requires auth cookie."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "dashboard"]
+            },
+            "description": "Get admin dashboard stats: total revenue, orders, customers, products, orders today, revenue today. Requires admin auth."
+          }
+        },
+        {
+          "name": "Analytics - Top Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/analytics?type=top_products&limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "analytics"],
+              "query": [
+                { "key": "type", "value": "top_products" },
+                { "key": "limit", "value": "5" }
+              ]
+            },
+            "description": "Get top-selling products by quantity. Requires admin auth."
+          }
+        },
+        {
+          "name": "Analytics - Revenue by Day",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/analytics?type=revenue_by_day&days=30",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "analytics"],
+              "query": [
+                { "key": "type", "value": "revenue_by_day" },
+                { "key": "days", "value": "30" }
+              ]
+            },
+            "description": "Get daily revenue trends for the last N days. Requires admin auth."
+          }
+        },
+        {
+          "name": "Analytics - Recent Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/analytics?type=recent_orders&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "analytics"],
+              "query": [
+                { "key": "type", "value": "recent_orders" },
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "description": "Get most recent orders with user info. Requires admin auth."
+          }
+        },
+        {
+          "name": "Analytics - Haggle Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/analytics?type=haggle_stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "analytics"],
+              "query": [
+                { "key": "type", "value": "haggle_stats" }
+              ]
+            },
+            "description": "Get haggle session statistics: total sessions, acceptance rate, average discount. Requires admin auth."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Products",
+      "item": [
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "products"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "category_id", "value": "", "disabled": true },
+                { "key": "is_active", "value": "true", "disabled": true },
+                { "key": "search", "value": "", "disabled": true }
+              ]
+            },
+            "description": "List all products with filters and pagination. Requires admin auth."
+          }
+        },
+        {
+          "name": "Create Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Italian Linen Summer Suit\",\n  \"description\": \"Perfect for weddings and outdoor events\",\n  \"category_id\": \"<category-uuid>\",\n  \"base_price\": 299.99,\n  \"minimum_price\": 199.99,\n  \"cost_price\": 120.00,\n  \"stock_quantity\": 50,\n  \"image_url\": \"https://example.com/suit.jpg\",\n  \"images\": [],\n  \"metadata\": {\n    \"material\": \"Italian Linen\",\n    \"occasion\": \"formal\",\n    \"season\": \"summer\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "products"]
+            },
+            "description": "Create a new product. Auto-generates slug and embedding. Requires admin auth."
+          }
+        },
+        {
+          "name": "Get Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "products", ":id"],
+              "variable": [
+                { "key": "id", "value": "<product-uuid>" }
+              ]
+            },
+            "description": "Get product details by ID. Requires admin auth."
+          }
+        },
+        {
+          "name": "Update Product",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Product Name\",\n  \"base_price\": 249.99,\n  \"stock_quantity\": 100\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "products", ":id"],
+              "variable": [
+                { "key": "id", "value": "<product-uuid>" }
+              ]
+            },
+            "description": "Update product fields. Re-embeds if name/description/metadata changed. Requires admin auth."
+          }
+        },
+        {
+          "name": "Delete Product",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "products", ":id"],
+              "variable": [
+                { "key": "id", "value": "<product-uuid>" }
+              ]
+            },
+            "description": "Delete a product. Embedding auto-deleted via CASCADE. Requires admin auth."
+          }
+        },
+        {
+          "name": "Get Product Variants",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/:id/variants",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "products", ":id", "variants"],
+              "variable": [
+                { "key": "id", "value": "<product-uuid>" }
+              ]
+            },
+            "description": "Get all variants for a product. Requires admin auth."
+          }
+        },
+        {
+          "name": "Create Product Variant",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"SUIT-BLU-M\",\n  \"color\": \"Blue\",\n  \"size\": \"M\",\n  \"stock_quantity\": 25,\n  \"price_adjustment\": 0,\n  \"image_url\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/:id/variants",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "products", ":id", "variants"],
+              "variable": [
+                { "key": "id", "value": "<product-uuid>" }
+              ]
+            },
+            "description": "Create a new variant for a product. Requires admin auth."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Categories",
+      "item": [
+        {
+          "name": "List Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "categories"]
+            },
+            "description": "Get all categories. Requires admin auth."
+          }
+        },
+        {
+          "name": "Create Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Fashion\",\n  \"description\": \"Clothing and accessories\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "categories"]
+            },
+            "description": "Create a new category. Auto-generates slug. Requires admin auth."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Discounts",
+      "item": [
+        {
+          "name": "List Discounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/discounts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "discounts"]
+            },
+            "description": "Get all discount codes. Requires admin auth."
+          }
+        },
+        {
+          "name": "Create Discount",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SAVE20\",\n  \"discount_type\": \"percentage\",\n  \"discount_value\": 20,\n  \"usage_limit\": 100,\n  \"min_purchase_amount\": 50,\n  \"max_discount_amount\": 30,\n  \"expires_at\": \"2025-12-31\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/discounts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "discounts"]
+            },
+            "description": "Create a discount code. discount_type: 'percentage' or 'fixed'. Requires admin auth."
+          }
+        },
+        {
+          "name": "Update Discount",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"discount_value\": 25,\n  \"usage_limit\": 200\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/discounts/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "discounts", ":id"],
+              "variable": [
+                { "key": "id", "value": "<discount-uuid>" }
+              ]
+            },
+            "description": "Update a discount code. Requires admin auth."
+          }
+        },
+        {
+          "name": "Deactivate Discount",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/discounts/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "discounts", ":id"],
+              "variable": [
+                { "key": "id", "value": "<discount-uuid>" }
+              ]
+            },
+            "description": "Deactivate a discount code (soft delete). Requires admin auth."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Orders",
+      "item": [
+        {
+          "name": "List Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/orders?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "orders"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "status", "value": "", "disabled": true, "description": "pending | processing | shipped | delivered | cancelled" },
+                { "key": "payment_status", "value": "", "disabled": true, "description": "pending | paid | failed | refunded" },
+                { "key": "date_from", "value": "", "disabled": true },
+                { "key": "date_to", "value": "", "disabled": true }
+              ]
+            },
+            "description": "List all orders with filters. Requires admin auth."
+          }
+        },
+        {
+          "name": "Get Order by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/orders/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "orders", ":id"],
+              "variable": [
+                { "key": "id", "value": "<order-uuid>" }
+              ]
+            },
+            "description": "Get full order details with user, items, and shipping info. Requires admin auth."
+          }
+        },
+        {
+          "name": "Update Order Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"processing\",\n  \"payment_status\": \"paid\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/orders/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "orders", ":id"],
+              "variable": [
+                { "key": "id", "value": "<order-uuid>" }
+              ]
+            },
+            "description": "Update order status and/or payment status. Requires admin auth."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Embeddings",
+      "item": [
+        {
+          "name": "Embed All Products",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"all\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/embed",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "embed"]
+            },
+            "description": "Re-generate embeddings for ALL active products. Use if products were missed or embedding errors occurred. Requires admin auth."
+          }
+        },
+        {
+          "name": "Embed Single Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"<product-uuid>\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/embed",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "embed"]
+            },
+            "description": "Re-generate embedding for a single product. Requires admin auth."
+          }
+        }
+      ]
+    }
+  ]
+}

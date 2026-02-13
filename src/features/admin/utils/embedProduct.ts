@@ -60,13 +60,20 @@ export async function embedProduct(productId: string): Promise<void> {
 
   const embedding = await embeddingService.generateEmbedding(text);
 
+  if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
+    throw new Error(`Embedding generation returned empty result for product ${productId}`);
+  }
+
+  // pgvector expects the vector as a string in format [0.1,0.2,...]
+  const vectorString = `[${embedding.join(',')}]`;
+
   // Upsert into product_embeddings
   const { error: upsertError } = await supabase
     .from('product_embeddings')
     .upsert(
       {
         product_id: productId,
-        embedding: JSON.stringify(embedding),
+        embedding: vectorString,
         content: text,
       },
       { onConflict: 'product_id' }
