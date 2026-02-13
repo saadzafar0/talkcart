@@ -191,7 +191,7 @@ export const productService = {
       const { data: matches, error: rpcError } = await supabase.rpc(
         'search_products_by_embedding',
         {
-          query_embedding: JSON.stringify(queryEmbedding),
+          query_embedding: `[${queryEmbedding.join(',')}]`,
           match_threshold: 0.7,
           match_count: limit,
         }
