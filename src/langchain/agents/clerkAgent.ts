@@ -1,11 +1,107 @@
-// TODO: implement - main clerk agent with LangChain
+import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
+import {
+  BaseMessage,
+  HumanMessage,
+  AIMessage,
+  SystemMessage,
+  ToolMessage,
+} from '@langchain/core/messages';
+import { createGeminiLLM } from '../config/geminiConfig';
+import { CLERK_SYSTEM_PROMPT } from '../prompts/clerkPersonality';
+import { allTools } from '../tools';
 
-export async function clerkAgent(message: string, context?: Record<string, unknown>) {
-  // TODO: implement
-  // 1. Create Gemini LLM
-  // 2. Bind tools (search, filter, addToCart, checkStock)
-  // 3. Create agent with clerk personality prompt
-  // 4. Execute with message and chat history
-  // 5. Return response with any tool calls
-  throw new Error('Not implemented');
+const MAX_ITERATIONS = 5;
+
+export interface ClerkAgentResult {
+  output: string;
+  toolCalls: { name: string; args: Record<string, unknown> }[];
+}
+
+/**
+ * Main clerk agent — handles general shopping conversations.
+ * Uses Gemini LLM with tool calling (bindTools) for search, cart, stock,
+ * discounts, and haggling. Implements a manual agentic loop.
+ */
+export async function clerkAgent(
+  message: string,
+  context?: {
+    chatHistory?: BaseMessage[];
+    userId?: string | null;
+  }
+): Promise<ClerkAgentResult> {
+  const llm = createGeminiLLM(0.7);
+  const llmWithTools = llm.bindTools(allTools);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const toolsByName = new Map<string, any>(allTools.map((t) => [t.name, t]));
+
+  const collectedToolCalls: { name: string; args: Record<string, unknown> }[] = [];
+
+  // Build message history
+  const messages: BaseMessage[] = [
+    new SystemMessage(CLERK_SYSTEM_PROMPT),
+    ...(context?.chatHistory || []),
+  ];
+
+  // Inject userId context
+  const enrichedInput = context?.userId
+    ? `[User ID: ${context.userId}] ${message}`
+    : message;
+
+  messages.push(new HumanMessage(enrichedInput));
+
+  // Agentic tool-calling loop
+  for (let i = 0; i < MAX_ITERATIONS; i++) {
+    const response = await llmWithTools.invoke(messages);
+    messages.push(response);
+
+    // Check if the model made tool calls
+    const toolCalls = response.tool_calls;
+    if (!toolCalls || toolCalls.length === 0) {
+      // No tool calls — return final text response
+      const text =
+        typeof response.content === 'string'
+          ? response.content
+          : response.content.toString();
+      return { output: text, toolCalls: collectedToolCalls };
+    }
+
+    // Execute each tool call and append results
+    for (const tc of toolCalls) {
+      const tool = toolsByName.get(tc.name);
+      let result: string;
+
+      if (tool) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          result = await (tool as any).invoke(tc.args);
+        } catch (err: any) {
+          result = JSON.stringify({ error: err.message || 'Tool execution failed' });
+        }
+      } else {
+        result = JSON.stringify({ error: `Unknown tool: ${tc.name}` });
+      }
+
+      collectedToolCalls.push({
+        name: tc.name,
+        args: tc.args as Record<string, unknown>,
+      });
+
+      messages.push(
+        new ToolMessage({
+          content: result,
+          tool_call_id: tc.id || tc.name,
+        })
+      );
+    }
+  }
+
+  // If we exhausted iterations, return the last response
+  const lastAI = messages.filter((m) => m instanceof AIMessage).pop();
+  const fallback = lastAI
+    ? typeof lastAI.content === 'string'
+      ? lastAI.content
+      : lastAI.content.toString()
+    : "I'm still working on that! Could you try again?";
+
+  return { output: fallback, toolCalls: collectedToolCalls };
 }

@@ -38,9 +38,7 @@ export async function POST(req: NextRequest) {
       ? Math.min(Math.max(body.limit, 1), 50) 
       : 10;
 
-    // Perform semantic search
-    // Note: Currently uses basic text search. 
-    // TODO: Integrate with LangChain for true RAG semantic search using embeddings
+    // Perform semantic search via RAG (vector embeddings with text fallback)
     const products = await productService.search(body.query, limit);
 
     return successResponse({
