@@ -6,7 +6,8 @@ This folder contains comprehensive test collections for the TalkCart API endpoin
 
 1. **TalkCart-Products-API.postman_collection.json** - Product catalog endpoints
 2. **TalkCart-Cart-API.postman_collection.json** - Shopping cart endpoints
-3. **TalkCart-Chat-API.postman_collection.json** - AI Chat assistant endpoints (NEW!)
+3. **TalkCart-Chat-API.postman_collection.json** - AI Chat assistant endpoints
+4. **TalkCart-Haggle-API.postman_collection.json** - Price negotiation endpoints (NEW!)
 
 ## Import Instructions
 
@@ -433,9 +434,92 @@ After testing the Products API:
 3. Test Haggle/Negotiation endpoints
 4. Test Checkout & Orders endpoints
 
+---
+
+## 🤝 Haggle API Collection (NEW!)
+
+### Overview
+The Haggle API powers TalkCart's price negotiation feature. Users can try to negotiate better prices on products through natural conversation with an AI agent.
+
+### Endpoints
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/haggle` | Optional | Start or continue a price negotiation |
+| POST | `/api/haggle/accept` | Optional | Accept the current deal and get a discount code |
+
+### POST `/api/haggle`
+
+**Request body:**
+```json
+{
+  "product_id": "uuid",
+  "message": "It's my birthday, can I get a discount?",
+  "session_id": "uuid (optional, to continue existing negotiation)"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Happy early birthday! I can offer you 15% off...",
+    "session": {
+      "id": "uuid",
+      "status": "negotiating",
+      "original_price": 299.99,
+      "offered_price": 254.99
+    },
+    "discount_code": null
+  }
+}
+```
+
+### POST `/api/haggle/accept`
+
+**Request body:**
+```json
+{
+  "session_id": "uuid"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Deal accepted! 🎉 Use code \"HAGGLE-ABC123\" at checkout...",
+    "session": {
+      "id": "uuid",
+      "status": "accepted",
+      "final_price": 254.99
+    },
+    "discount_code": {
+      "code": "HAGGLE-ABC123",
+      "discount_type": "fixed",
+      "discount_value": 45.00
+    }
+  }
+}
+```
+
+### Haggle Logic
+- Polite requests → 5-20% discount
+- Birthday / special occasion → 10-20% discount
+- Bulk purchase → 5-15% discount
+- Rude / demanding → minimal or no discount
+- Maximum discount: 30% off base price
+- Creates a unique 1-use discount code on acceptance
+
+### Test Workflow
+1. Login → 2. Get product → 3. Start haggling → 4. Counter offer → 5. Accept deal
+
 ## Support
 
 For issues or questions:
 - Check the technical documentation in `/docs/techdoc.txt`
 - Review the schema in `/docs/schema.txt`
-- Check API route implementations in `/src/app/api/products/`
+- Check the RAG system docs in `/docs/rag-system.txt`
+- Check API route implementations in `/src/app/api/`

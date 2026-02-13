@@ -1,0 +1,626 @@
+{
+  "info": {
+    "name": "TalkCart - Haggle API",
+    "description": "API collection for testing the TalkCart Haggle (Price Negotiation) endpoints.\n\nEndpoints:\n- POST /api/haggle - Negotiate a price on a product\n- POST /api/haggle/accept - Accept the current deal and get a discount code\n\nAuthentication is optional — works for both logged-in and anonymous users.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testProductId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "haggleSessionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "discountCode",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "description": "Login to get an auth token for testing.",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login successful', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.be.true;",
+                  "});",
+                  "",
+                  "// Auth token is set via cookie automatically"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Setup",
+      "description": "Get a product ID to use for haggling.",
+      "item": [
+        {
+          "name": "Get Products (for product ID)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Products retrieved', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.be.true;",
+                  "  pm.expect(json.data.products.length).to.be.above(0);",
+                  "  ",
+                  "  const product = json.data.products[0];",
+                  "  pm.collectionVariables.set('testProductId', product.id);",
+                  "  console.log('Using product:', product.name, '- $' + product.base_price);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Haggle Operations",
+      "description": "Price negotiation endpoints.",
+      "item": [
+        {
+          "name": "Start Negotiation - Polite Request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Negotiation started', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.be.true;",
+                  "  pm.expect(json.data.message).to.be.a('string');",
+                  "  pm.expect(json.data.session).to.be.an('object');",
+                  "  pm.expect(json.data.session.status).to.equal('negotiating');",
+                  "  ",
+                  "  pm.collectionVariables.set('haggleSessionId', json.data.session.id);",
+                  "  console.log('Agent says:', json.data.message);",
+                  "  console.log('Offered price: $' + json.data.session.offered_price);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{testProductId}}\",\n  \"message\": \"Hi! I really love this product. It's my birthday coming up and I was wondering if you could offer a little discount? I'd really appreciate it!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haggle",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haggle"]
+            }
+          }
+        },
+        {
+          "name": "Continue Negotiation - Counter Offer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Negotiation continued', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.be.true;",
+                  "  pm.expect(json.data.message).to.be.a('string');",
+                  "  pm.expect(json.data.session.status).to.be.oneOf(['negotiating', 'accepted']);",
+                  "  ",
+                  "  // Update session ID in case it changed",
+                  "  pm.collectionVariables.set('haggleSessionId', json.data.session.id);",
+                  "  console.log('Agent says:', json.data.message);",
+                  "  console.log('Offered price: $' + json.data.session.offered_price);",
+                  "  ",
+                  "  if (json.data.discount_code) {",
+                  "    pm.collectionVariables.set('discountCode', json.data.discount_code.code);",
+                  "    console.log('Discount code received:', json.data.discount_code.code);",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{testProductId}}\",\n  \"message\": \"That's a great offer! But I'm also buying two of these for my friends. Could you do a bit more? Maybe 20% off?\",\n  \"session_id\": \"{{haggleSessionId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haggle",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haggle"]
+            }
+          }
+        },
+        {
+          "name": "Rude Negotiation (Test Lower Discount)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Rude negotiation handled', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.be.true;",
+                  "  pm.expect(json.data.message).to.be.a('string');",
+                  "  console.log('Agent response to rudeness:', json.data.message);",
+                  "  console.log('Offered price: $' + json.data.session.offered_price);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{testProductId}}\",\n  \"message\": \"This is way too expensive. Just give me 50% off or I'm leaving.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haggle",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haggle"]
+            }
+          }
+        },
+        {
+          "name": "Accept Deal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Deal accepted', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.be.true;",
+                  "  pm.expect(json.data.session.status).to.equal('accepted');",
+                  "  pm.expect(json.data.discount_code).to.be.an('object');",
+                  "  pm.expect(json.data.discount_code.code).to.be.a('string');",
+                  "  ",
+                  "  pm.collectionVariables.set('discountCode', json.data.discount_code.code);",
+                  "  console.log('Deal accepted!');",
+                  "  console.log('Discount code:', json.data.discount_code.code);",
+                  "  console.log('Discount value: $' + json.data.discount_code.discount_value);",
+                  "  console.log('Final price: $' + json.data.session.final_price);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"{{haggleSessionId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haggle/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haggle", "accept"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error Cases",
+      "description": "Test error handling.",
+      "item": [
+        {
+          "name": "Haggle - Missing product_id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 400 for missing product_id', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Can I get a discount?\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haggle",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haggle"]
+            }
+          }
+        },
+        {
+          "name": "Haggle - Missing message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 400 for missing message', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{testProductId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haggle",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haggle"]
+            }
+          }
+        },
+        {
+          "name": "Haggle - Invalid product ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 404 for invalid product', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"00000000-0000-0000-0000-000000000000\",\n  \"message\": \"Can I get a discount?\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haggle",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haggle"]
+            }
+          }
+        },
+        {
+          "name": "Accept - Missing session_id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 400 for missing session_id', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haggle/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haggle", "accept"]
+            }
+          }
+        },
+        {
+          "name": "Accept - Invalid session_id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 404 for invalid session', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"00000000-0000-0000-0000-000000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haggle/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haggle", "accept"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Test Workflow",
+      "description": "Run these in order to test the full haggle flow:\n1. Login\n2. Get a product\n3. Start negotiation\n4. Continue negotiation\n5. Accept deal\n6. Verify discount code",
+      "item": [
+        {
+          "name": "1. Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Step 1: Login', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "2. Get Product to Haggle On",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Step 2: Got product', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  const product = json.data.products[0];",
+                  "  pm.collectionVariables.set('testProductId', product.id);",
+                  "  console.log('Haggling on:', product.name, '($' + product.base_price + ')');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"]
+            }
+          }
+        },
+        {
+          "name": "3. Start Haggling",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Step 3: Negotiation started', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.data.session.status).to.equal('negotiating');",
+                  "  pm.collectionVariables.set('haggleSessionId', json.data.session.id);",
+                  "  console.log('Clerk says:', json.data.message);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{testProductId}}\",\n  \"message\": \"Hey! It's my birthday next week and I'm buying gifts for my friends too. Can I get a nice discount?\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haggle",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haggle"]
+            }
+          }
+        },
+        {
+          "name": "4. Counter Offer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Step 4: Counter offer received', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('haggleSessionId', json.data.session.id);",
+                  "  console.log('Clerk:', json.data.message);",
+                  "  console.log('Current offer: $' + json.data.session.offered_price);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{testProductId}}\",\n  \"message\": \"That sounds fair! I'll take the deal. Thank you so much!\",\n  \"session_id\": \"{{haggleSessionId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haggle",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haggle"]
+            }
+          }
+        },
+        {
+          "name": "5. Accept Deal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Step 5: Deal accepted with code', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.data.session.status).to.equal('accepted');",
+                  "  pm.expect(json.data.discount_code).to.be.an('object');",
+                  "  pm.collectionVariables.set('discountCode', json.data.discount_code.code);",
+                  "  console.log('🎉 Discount code:', json.data.discount_code.code);",
+                  "  console.log('Savings: $' + json.data.discount_code.discount_value);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"{{haggleSessionId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haggle/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haggle", "accept"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
