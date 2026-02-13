@@ -1,0 +1,103 @@
+Frontend:
+Next.js 14+ (App Router) - Your main framework
+Styling
+Tailwind CSS - Fast, professional-looking UI
+shadcn/ui - Pre-built components (saves hours)
+Framer Motion - Smooth animations when UI updates from chat
+
+Design should be professional and follow the given below color scheme:
+
+/* ============================================
+   PRIMARY - Charcoal Brown (Authority, Premium)
+   ============================================ */
+--primary-900: #423E37      /* Navbar, Footer, Headings */
+--primary-800: #4A453D      /* Slightly lighter for hover */
+--primary-700: #5C5650      /* Borders, subtle backgrounds */
+--primary-600: #6E675F      /* Dim Grey - Secondary text */
+--primary-500: #857E76      /* Lighter text */
+
+/* ============================================
+   ACCENT - Sunflower Gold (AI Personality, CTAs)
+   ============================================ */
+--accent-700: #C69520       /* Darker gold for hover */
+--accent-600: #E3B23C       /* Primary accent - Chat, Badges */
+--accent-500: #E8BC54       /* Lighter accent */
+--accent-400: #EDC66C       /* Hover states */
+--accent-300: #F2D084       /* Very light accent */
+
+/* ============================================
+   NEUTRAL - Eggshell & Granite (Backgrounds)
+   ============================================ */
+--neutral-50: #EDEBD7       /* Page background, Light areas */
+--neutral-100: #E5E3D0      /* Card backgrounds */
+--neutral-200: #D1CEC0      /* Borders */
+--neutral-300: #BDB9A8      /* Dividers */
+--neutral-500: #A39594      /* Rosy Granite - Muted text */
+--neutral-600: #8A7F7E      /* Secondary elements */
+--neutral-900: #423E37      /* Dark text */
+
+/* ============================================
+   SEMANTIC COLORS
+   ============================================ */
+--success-600: #6B8E23      /* Olive green (complements palette) */
+--success-500: #7FA534      /* Discounts, In stock */
+
+--error-600: #A0522D        /* Sienna (warm red that fits palette) */
+--error-500: #BC6C3E        /* Out of stock, Errors */
+
+--warning-600: #D2691E      /* Chocolate (complements gold) */
+--warning-500: #E07C35      /* Low stock warnings */
+
+/* ============================================
+   BACKGROUND GRADIENTS
+   ============================================ */
+--gradient-hero: linear-gradient(135deg, #423E37 0%, #6E675F 100%);
+--gradient-accent: linear-gradient(135deg, #E3B23C 0%, #C69520 100%);
+
+
+
+
+AI & RAG System:
+Gemini API  with Function Calling
+langchain tools
+
+
+For the "Clerk" personality
+Function calling to trigger UI actions
+Fast and reliable
+
+Vector Embeddings for RAG:
+Supabase + pgvector (if you want a full backend)
+
+State Management
+ReacRedux
+
+E-commerce Backend
+custom backend (Node.js/Express) + Supabase Database
+
+Auth:
+Cookies +JWT for session management
+
+
+## 🎯 API Endpoints Structure
+```
+POST /api/auth/register
+POST /api/auth/login
+POST /api/auth/logout
+
+GET  /api/products
+GET  /api/products/:slug
+POST /api/products/search (RAG semantic search)
+
+GET  /api/cart
+POST /api/cart/add
+DELETE /api/cart/remove/:itemId
+
+POST /api/chat (Gemini conversation + function calling)
+GET  /api/chat/history
+
+POST /api/haggle (negotiate price)
+POST /api/haggle/accept (accept deal, generate code)
+
+POST /api/orders
+GET  /api/orders/:id

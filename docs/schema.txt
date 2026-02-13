@@ -1,0 +1,363 @@
+-- ============================================
+-- USERS & AUTHENTICATION
+-- ============================================
+
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  full_name VARCHAR(255),
+  phone VARCHAR(20),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE user_addresses (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  address_line1 VARCHAR(255) NOT NULL,
+  address_line2 VARCHAR(255),
+  city VARCHAR(100) NOT NULL,
+  state VARCHAR(100),
+  postal_code VARCHAR(20) NOT NULL,
+  country VARCHAR(100) NOT NULL,
+  is_default BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================
+-- PRODUCTS & INVENTORY
+-- ============================================
+
+CREATE TABLE categories (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(100) NOT NULL,
+  slug VARCHAR(100) UNIQUE NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE products (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) UNIQUE NOT NULL,
+  description TEXT,
+  category_id UUID REFERENCES categories(id),
+  base_price DECIMAL(10, 2) NOT NULL,
+  minimum_price DECIMAL(10, 2) NOT NULL, -- For haggle logic (bottom price)
+  cost_price DECIMAL(10, 2), -- Your actual cost (for profit calculation)
+  image_url TEXT,
+  images JSONB, -- Array of image URLs: ["url1", "url2", ...]
+  rating DECIMAL(3, 2) DEFAULT 0, -- Average rating (0-5)
+  review_count INTEGER DEFAULT 0,
+  stock_quantity INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  metadata JSONB, -- For extra attributes: {"material": "cotton", "brand": "Nike", ...}
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Product variants (color, size, etc.)
+CREATE TABLE product_variants (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  sku VARCHAR(100) UNIQUE NOT NULL,
+  color VARCHAR(50),
+  size VARCHAR(20),
+  stock_quantity INTEGER DEFAULT 0,
+  price_adjustment DECIMAL(10, 2) DEFAULT 0, -- +/- from base price
+  image_url TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Product reviews
+CREATE TABLE product_reviews (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+  title VARCHAR(255),
+  comment TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================
+-- VECTOR EMBEDDINGS FOR RAG
+-- ============================================
+
+-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE product_embeddings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  embedding vector(768), -- Gemini embedding dimension (adjust if needed)
+  content TEXT, -- The text that was embedded (product name + description + metadata)
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Index for fast similarity search
+CREATE INDEX product_embeddings_idx ON product_embeddings 
+USING ivfflat (embedding vector_cosine_ops)
+WITH (lists = 100);
+
+-- ============================================
+-- SHOPPING CART
+-- ============================================
+
+CREATE TABLE carts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  session_id VARCHAR(255), -- For anonymous users
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(user_id),
+  UNIQUE(session_id)
+);
+
+CREATE TABLE cart_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  cart_id UUID REFERENCES carts(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  variant_id UUID REFERENCES product_variants(id) ON DELETE SET NULL,
+  quantity INTEGER NOT NULL DEFAULT 1,
+  price_at_addition DECIMAL(10, 2) NOT NULL, -- Lock in price when added
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================
+-- HAGGLE & DISCOUNTS
+-- ============================================
+
+CREATE TABLE discount_codes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  code VARCHAR(50) UNIQUE NOT NULL,
+  discount_type VARCHAR(20) CHECK (discount_type IN ('percentage', 'fixed')),
+  discount_value DECIMAL(10, 2) NOT NULL,
+  user_id UUID REFERENCES users(id), -- Personalized discount
+  product_id UUID REFERENCES products(id), -- Product-specific discount
+  min_purchase_amount DECIMAL(10, 2),
+  max_discount_amount DECIMAL(10, 2),
+  usage_limit INTEGER DEFAULT 1,
+  used_count INTEGER DEFAULT 0,
+  expires_at TIMESTAMP,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE haggle_sessions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id),
+  session_id VARCHAR(255), -- For anonymous users
+  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  original_price DECIMAL(10, 2) NOT NULL,
+  offered_price DECIMAL(10, 2),
+  final_price DECIMAL(10, 2),
+  reason TEXT, -- User's reason for discount
+  sentiment_score DECIMAL(3, 2), -- -1 to 1 (rude to polite)
+  discount_code_id UUID REFERENCES discount_codes(id),
+  status VARCHAR(20) CHECK (status IN ('negotiating', 'accepted', 'rejected')),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================
+-- ORDERS & CHECKOUT
+-- ============================================
+
+CREATE TABLE orders (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id),
+  order_number VARCHAR(50) UNIQUE NOT NULL,
+  status VARCHAR(50) CHECK (status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled')),
+  subtotal DECIMAL(10, 2) NOT NULL,
+  discount_amount DECIMAL(10, 2) DEFAULT 0,
+  tax_amount DECIMAL(10, 2) DEFAULT 0,
+  shipping_amount DECIMAL(10, 2) DEFAULT 0,
+  total_amount DECIMAL(10, 2) NOT NULL,
+  discount_code_id UUID REFERENCES discount_codes(id),
+  
+  -- Shipping info
+  shipping_address_id UUID REFERENCES user_addresses(id),
+  shipping_method VARCHAR(50),
+  
+  -- Payment info (store securely or use payment gateway)
+  payment_method VARCHAR(50),
+  payment_status VARCHAR(50) CHECK (payment_status IN ('pending', 'paid', 'failed', 'refunded')),
+  
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE order_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id),
+  variant_id UUID REFERENCES product_variants(id),
+  product_name VARCHAR(255) NOT NULL, -- Snapshot in case product is deleted
+  quantity INTEGER NOT NULL,
+  unit_price DECIMAL(10, 2) NOT NULL, -- Price at time of order
+  subtotal DECIMAL(10, 2) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================
+-- CHAT HISTORY (AI Clerk)
+-- ============================================
+
+CREATE TABLE chat_sessions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id),
+  session_id VARCHAR(255), -- For anonymous users
+  started_at TIMESTAMP DEFAULT NOW(),
+  ended_at TIMESTAMP,
+  metadata JSONB -- Store context like last viewed products
+);
+
+CREATE TABLE chat_messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  chat_session_id UUID REFERENCES chat_sessions(id) ON DELETE CASCADE,
+  role VARCHAR(20) CHECK (role IN ('user', 'assistant', 'system')),
+  content TEXT NOT NULL,
+  function_calls JSONB, -- Store Gemini function calls: [{"name": "filter_products", "args": {...}}]
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================
+-- USER ACTIVITY (for personalized recommendations)
+-- ============================================
+
+CREATE TABLE user_activities (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id),
+  session_id VARCHAR(255), -- For anonymous users
+  activity_type VARCHAR(50) CHECK (activity_type IN ('view_product', 'add_to_cart', 'remove_from_cart', 'search', 'purchase', 'chat')),
+  product_id UUID REFERENCES products(id),
+  metadata JSONB, -- Store extra data like search query, filters applied, etc.
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Index for fast activity queries
+CREATE INDEX user_activities_user_id_idx ON user_activities(user_id);
+CREATE INDEX user_activities_created_at_idx ON user_activities(created_at DESC);
+
+-- ============================================
+-- INDEXES FOR PERFORMANCE
+-- ============================================
+
+CREATE INDEX products_category_id_idx ON products(category_id);
+CREATE INDEX products_is_active_idx ON products(is_active);
+CREATE INDEX cart_items_cart_id_idx ON cart_items(cart_id);
+CREATE INDEX order_items_order_id_idx ON order_items(order_id);
+CREATE INDEX orders_user_id_idx ON orders(user_id);
+CREATE INDEX chat_messages_session_id_idx ON chat_messages(chat_session_id);
+
+-- ============================================
+-- FUNCTIONS & TRIGGERS
+-- ============================================
+
+-- Auto-update timestamps
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_carts_updated_at BEFORE UPDATE ON carts
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Update product rating when new review is added
+CREATE OR REPLACE FUNCTION update_product_rating()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE products
+  SET rating = (
+    SELECT AVG(rating) FROM product_reviews WHERE product_id = NEW.product_id
+  ),
+  review_count = (
+    SELECT COUNT(*) FROM product_reviews WHERE product_id = NEW.product_id
+  )
+  WHERE id = NEW.product_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_product_rating_trigger AFTER INSERT ON product_reviews
+FOR EACH ROW EXECUTE FUNCTION update_product_rating();
+
+-- ============================================
+-- RAG SEARCH FUNCTION (Vector Similarity)
+-- ============================================
+
+CREATE OR REPLACE FUNCTION search_products_by_embedding(
+  query_embedding vector(768),
+  match_threshold float DEFAULT 0.7,
+  match_count int DEFAULT 5
+)
+RETURNS TABLE (
+  product_id UUID,
+  product_name VARCHAR,
+  similarity float
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    p.id,
+    p.name,
+    1 - (pe.embedding <=> query_embedding) AS similarity
+  FROM product_embeddings pe
+  JOIN products p ON pe.product_id = p.id
+  WHERE p.is_active = true
+    AND 1 - (pe.embedding <=> query_embedding) > match_threshold
+  ORDER BY pe.embedding <=> query_embedding
+  LIMIT match_count;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Insert categories
+INSERT INTO categories (id, name, slug) VALUES
+  (gen_random_uuid(), 'Fashion', 'fashion'),
+  (gen_random_uuid(), 'Electronics', 'electronics'),
+  (gen_random_uuid(), 'Home & Living', 'home-living'),
+  (gen_random_uuid(), 'Sports & Outdoors', 'sports-outdoors');
+
+-- Insert sample products (shortened for brevity)
+INSERT INTO products (id, name, slug, description, category_id, base_price, minimum_price, cost_price, image_url, stock_quantity, metadata) VALUES
+(
+  gen_random_uuid(),
+  'Italian Linen Summer Suit',
+  'italian-linen-summer-suit',
+  'Perfect for weddings in Tuscany. Lightweight, breathable, makes you look like a million euros.',
+  (SELECT id FROM categories WHERE slug = 'fashion'),
+  299.99,
+  220.00, -- Haggle floor price
+  150.00, -- Your cost
+  'https://images.unsplash.com/photo-1507679799987-c73779587ccf',
+  15,
+  '{"material": "100% Italian Linen", "occasion": "formal", "season": "summer", "fit": "slim"}'::jsonb
+),
+(
+  gen_random_uuid(),
+  'Aviator Sunglasses - Gold Frame',
+  'aviator-sunglasses-gold',
+  'Make everyone wonder if you''re a pilot or just really cool.',
+  (SELECT id FROM categories WHERE slug = 'fashion'),
+  89.99,
+  60.00,
+  35.00,
+  'https://images.unsplash.com/photo-1511499767150-a48a237f0083',
+  50,
+  '{"uv_protection": "UV400", "frame_material": "metal", "lens_type": "polarized"}'::jsonb
+);

@@ -1,0 +1,673 @@
+================================================
+TALKCHART - AI PERSONAL SHOPPER
+Modular File Structure Documentation
+================================================
+
+🎯 ARCHITECTURE PHILOSOPHY
+- Feature-based modular structure
+- Each feature is self-contained and can be enabled/disabled
+- LangChain integration for AI tools and chains
+- Clear separation: UI ↔ Business Logic ↔ Data Layer
+- Plugin-like architecture for extensibility
+
+================================================
+📁 PROJECT ROOT
+================================================
+
+talkchart/
+├── 📄 prd.txt                      # Product requirements & hackathon challenge
+├── 📄 techdoc.txt                  # Technical stack & color scheme
+├── 📄 schema.txt                   # Database schema & SQL
+├── 📄 filestructure.txt            # This file
+├── 📄 package.json                 # Dependencies & scripts
+├── 📄 tsconfig.json                # TypeScript configuration
+├── 📄 next.config.ts               # Next.js configuration
+├── 📄 postcss.config.mjs           # PostCSS & Tailwind setup
+├── 📄 tailwind.config.ts           # Tailwind customization (colors)
+├── 📄 .env.local                   # Environment variables (API keys)
+├── 📄 .env.example                 # Example env file
+├── 📄 .gitignore                   # Git ignore rules
+└── 📄 README.md                    # Setup & deployment docs
+
+================================================
+📁 SRC/ - MODULAR SOURCE CODE
+================================================
+
+src/
+├── 📁 app/                         # Next.js App Router (Presentation Layer)
+├── 📁 features/                    # Feature Modules (Business Logic)
+├── 📁 core/                        # Core/Shared Modules
+├── 📁 langchain/                   # LangChain AI Integration
+└── 📁 infrastructure/              # Infrastructure Layer (DB, APIs, etc.)
+
+================================================
+📁 APP/ - NEXT.JS APP ROUTER (PRESENTATION)
+================================================
+
+src/app/
+├── 📄 layout.tsx                   # Root layout with providers
+├── 📄 globals.css                  # Global styles + CSS variables
+├── 📄 page.tsx                     # Landing/Home page
+│
+├── 📁 (store)/                     # Route group: Main store
+│   ├── 📁 products/
+│   │   ├── 📄 page.tsx             # Product listing page
+│   │   └── 📁 [slug]/
+│   │       └── 📄 page.tsx         # Product detail page
+│   │       └── 📄 loading.tsx      # Loading UI
+│   │       └── 📄 error.tsx        # Error boundary
+│   │
+│   ├── 📁 cart/
+│   │   └── 📄 page.tsx             # Cart page
+│   │
+│   ├── 📁 checkout/
+│   │   ├── 📄 page.tsx             # Checkout form
+│   │   └── 📁 success/
+│   │       └── 📄 page.tsx         # Order confirmation
+│   │
+│   └── 📁 orders/
+│       ├── 📄 page.tsx             # Order history
+│       └── 📁 [id]/
+│           └── 📄 page.tsx         # Order details
+│
+├── 📁 (auth)/                      # Route group: Authentication
+│   ├── 📄 layout.tsx               # Auth layout (centered form)
+│   ├── 📁 login/
+│   │   └── 📄 page.tsx
+│   └── 📁 register/
+│       └── 📄 page.tsx
+│
+└── 📁 api/                         # API Routes (thin controllers)
+    ├── 📁 auth/
+    │   ├── 📄 register/route.ts    # Delegates to features/auth
+    │   ├── 📄 login/route.ts
+    │   └── 📄 logout/route.ts
+    │
+    ├── 📁 products/
+    │   ├── 📄 route.ts             # GET /api/products
+    │   ├── 📁 [slug]/
+    │   │   └── 📄 route.ts         # GET /api/products/:slug
+    │   └── 📁 search/
+    │       └── 📄 route.ts         # POST /api/products/search (RAG)
+    │
+    ├── 📁 cart/
+    │   ├── 📄 route.ts             # GET /api/cart
+    │   ├── 📁 add/route.ts         # POST /api/cart/add
+    │   └── 📁 remove/[itemId]/route.ts
+    │
+    ├── 📁 chat/
+    │   ├── 📄 route.ts             # POST /api/chat (LangChain agent)
+    │   └── 📁 history/route.ts
+    │
+    ├── 📁 haggle/
+    │   ├── 📄 route.ts             # POST /api/haggle
+    │   └── 📁 accept/route.ts
+    │
+    └── 📁 orders/
+        ├── 📄 route.ts
+        └── 📁 [id]/route.ts
+
+================================================
+📁 FEATURES/ - FEATURE MODULES (BUSINESS LOGIC)
+================================================
+
+Each feature is self-contained with:
+- UI components
+- Business logic
+- Types
+- Hooks
+- API services
+- State management
+
+src/features/
+│
+├── 📁 auth/                        # Authentication Feature
+│   ├── 📄 index.ts                 # Public API exports
+│   ├── 📁 components/
+│   │   ├── 📄 LoginForm.tsx
+│   │   ├── 📄 RegisterForm.tsx
+│   │   └── 📄 AuthGuard.tsx
+│   ├── 📁 hooks/
+│   │   ├── 📄 useAuth.ts
+│   │   └── 📄 useSession.ts
+│   ├── 📁 services/
+│   │   ├── 📄 authService.ts       # Login, register, logout logic
+│   │   └── 📄 tokenService.ts      # JWT handling
+│   ├── 📁 store/
+│   │   └── 📄 authSlice.ts         # Redux state
+│   ├── 📁 types/
+│   │   └── 📄 index.ts             # User, Session, LoginRequest, etc.
+│   └── 📁 utils/
+│       └── 📄 validators.ts        # Email, password validation
+│
+├── 📁 products/                    # Product Catalog Feature
+│   ├── 📄 index.ts
+│   ├── 📁 components/
+│   │   ├── 📄 ProductCard.tsx
+│   │   ├── 📄 ProductGrid.tsx
+│   │   ├── 📄 ProductDetail.tsx
+│   │   ├── 📄 ProductFilters.tsx
+│   │   ├── 📄 ProductSort.tsx
+│   │   ├── 📄 ProductReviews.tsx
+│   │   └── 📄 ProductImage.tsx
+│   ├── 📁 hooks/
+│   │   ├── 📄 useProducts.ts       # Fetch & filter products
+│   │   ├── 📄 useProductDetail.ts
+│   │   └── 📄 useProductFilters.ts
+│   ├── 📁 services/
+│   │   ├── 📄 productService.ts    # CRUD operations
+│   │   └── 📄 categoryService.ts
+│   ├── 📁 store/
+│   │   └── 📄 productsSlice.ts     # Products, filters, sorting state
+│   ├── 📁 types/
+│   │   └── 📄 index.ts             # Product, Category, Variant, etc.
+│   └── 📁 utils/
+│       ├── 📄 formatters.ts        # Format price, ratings
+│       └── 📄 filters.ts           # Filter logic
+│
+├── 📁 cart/                        # Shopping Cart Feature
+│   ├── 📄 index.ts
+│   ├── 📁 components/
+│   │   ├── 📄 CartWidget.tsx       # Header cart icon
+│   │   ├── 📄 CartDrawer.tsx       # Slide-out cart
+│   │   ├── 📄 CartItem.tsx
+│   │   ├── 📄 CartSummary.tsx
+│   │   └── 📄 DiscountCodeInput.tsx
+│   ├── 📁 hooks/
+│   │   ├── 📄 useCart.ts           # Add, remove, update cart
+│   │   └── 📄 useCartSync.ts       # Sync with backend
+│   ├── 📁 services/
+│   │   └── 📄 cartService.ts       # Cart API calls
+│   ├── 📁 store/
+│   │   └── 📄 cartSlice.ts         # Cart state + middleware for localStorage
+│   ├── 📁 types/
+│   │   └── 📄 index.ts             # Cart, CartItem, Discount
+│   └── 📁 utils/
+│       └── 📄 calculations.ts      # Calculate totals, discounts
+│
+├── 📁 checkout/                    # Checkout Feature
+│   ├── 📄 index.ts
+│   ├── 📁 components/
+│   │   ├── 📄 CheckoutForm.tsx
+│   │   ├── 📄 AddressForm.tsx
+│   │   ├── 📄 PaymentForm.tsx
+│   │   ├── 📄 OrderSummary.tsx
+│   │   └── 📄 CheckoutStepper.tsx
+│   ├── 📁 hooks/
+│   │   ├── 📄 useCheckout.ts
+│   │   └── 📄 useOrderCreation.ts
+│   ├── 📁 services/
+│   │   └── 📄 orderService.ts      # Create order, process payment
+│   ├── 📁 store/
+│   │   └── 📄 checkoutSlice.ts     # Checkout state (step, shipping info)
+│   ├── 📁 types/
+│   │   └── 📄 index.ts             # Order, Address, PaymentMethod
+│   └── 📁 utils/
+│       └── 📄 validators.ts        # Address, payment validation
+│
+├── 📁 chat/                        # AI Clerk Chat Feature
+│   ├── 📄 index.ts
+│   ├── 📁 components/
+│   │   ├── 📄 ChatWidget.tsx       # Floating chat button + modal
+│   │   ├── 📄 ChatMessage.tsx      # User/assistant message bubble
+│   │   ├── 📄 ChatInput.tsx        # Text input
+│   │   ├── 📄 ChatProductCard.tsx  # Rich product display in chat
+│   │   ├── 📄 ChatTypingIndicator.tsx
+│   │   └── 📄 ChatSuggestions.tsx  # Quick reply chips
+│   ├── 📁 hooks/
+│   │   ├── 📄 useChat.ts           # Send message, handle responses
+│   │   └── 📄 useChatHistory.ts    # Load chat history
+│   ├── 📁 services/
+│   │   └── 📄 chatService.ts       # Chat API calls
+│   ├── 📁 store/
+│   │   └── 📄 chatSlice.ts         # Messages, session, typing state
+│   ├── 📁 types/
+│   │   └── 📄 index.ts             # Message, ChatSession, FunctionCall
+│   └── 📁 utils/
+│       └── 📄 messageFormatter.ts  # Format messages for display
+│
+├── 📁 haggle/                      # Haggle/Negotiation Feature
+│   ├── 📄 index.ts
+│   ├── 📁 components/
+│   │   ├── 📄 HaggleDialog.tsx     # Haggle modal
+│   │   ├── 📄 HaggleProgress.tsx   # Show negotiation progress
+│   │   └── 📄 DiscountBadge.tsx    # Display discount achieved
+│   ├── 📁 hooks/
+│   │   ├── 📄 useHaggle.ts         # Negotiate price
+│   │   └── 📄 useDiscountCode.ts   # Apply generated code
+│   ├── 📁 services/
+│   │   └── 📄 haggleService.ts     # Haggle API calls
+│   ├── 📁 store/
+│   │   └── 📄 haggleSlice.ts       # Haggle session state
+│   ├── 📁 types/
+│   │   └── 📄 index.ts             # HaggleSession, DiscountCode
+│   └── 📁 utils/
+│       ├── 📄 priceCalculator.ts   # Calculate haggle price
+│       ├── 📄 sentimentAnalyzer.ts # Detect tone (polite/rude)
+│       └── 📄 codeGenerator.ts     # Generate BDAY-20, etc.
+│
+└── 📁 analytics/                   # User Activity Tracking (optional)
+    ├── 📄 index.ts
+    ├── 📁 services/
+    │   └── 📄 trackingService.ts   # Track user events
+    └── 📁 types/
+        └── 📄 index.ts             # ActivityEvent, UserSession
+
+================================================
+📁 LANGCHAIN/ - AI INTEGRATION (MODULAR)
+================================================
+
+src/langchain/
+│
+├── 📄 index.ts                     # Main LangChain exports
+│
+├── 📁 agents/                      # LangChain Agents
+│   ├── 📄 clerkAgent.ts            # Main AI Clerk agent
+│   ├── 📄 haggleAgent.ts           # Specialized haggle negotiator
+│   └── 📄 productAgent.ts          # Product recommendation agent
+│
+├── 📁 chains/                      # LangChain Chains
+│   ├── 📄 conversationChain.ts     # Main conversation chain
+│   ├── 📄 ragChain.ts              # RAG search chain
+│   ├── 📄 haggleChain.ts           # Price negotiation chain
+│   └── 📄 recommendationChain.ts   # Product recommendation chain
+│
+├── 📁 tools/                       # LangChain Tools (Function Calling)
+│   ├── 📄 index.ts                 # Export all tools
+│   ├── 📄 searchProductsTool.ts    # Search products by query
+│   ├── 📄 filterProductsTool.ts    # Filter products (price, category)
+│   ├── 📄 checkStockTool.ts        # Check product stock
+│   ├── 📄 addToCartTool.ts         # Add product to cart
+│   ├── 📄 applyDiscountTool.ts     # Apply discount code
+│   ├── 📄 hagglePriceTool.ts       # Negotiate price
+│   ├── 📄 getUserActivityTool.ts   # Get user's past activity
+│   └── 📄 getRecommendationsTool.ts # Get personalized recommendations
+│
+├── 📁 prompts/                     # Prompt Templates
+│   ├── 📄 clerkPersonality.ts      # Main clerk system prompt
+│   ├── 📄 hagglePrompts.ts         # Haggle conversation prompts
+│   ├── 📄 productPrompts.ts        # Product recommendation prompts
+│   └── 📄 responseFormats.ts       # JSON response formats
+│
+├── 📁 memory/                      # Conversation Memory
+│   ├── 📄 chatMemory.ts            # Store chat history
+│   └── 📄 userContextMemory.ts     # Store user context (cart, preferences)
+│
+├── 📁 embeddings/                  # Vector Embeddings
+│   ├── 📄 embeddingService.ts      # Generate embeddings (Gemini)
+│   └── 📄 vectorStore.ts           # Supabase pgvector integration
+│
+├── 📁 retrievers/                  # RAG Retrievers
+│   ├── 📄 productRetriever.ts      # Retrieve products by similarity
+│   └── 📄 contextRetriever.ts      # Retrieve conversation context
+│
+└── 📁 config/                      # LangChain Configuration
+    ├── 📄 geminiConfig.ts          # Gemini API setup
+    ├── 📄 toolConfig.ts            # Tool configurations
+    └── 📄 chainConfig.ts           # Chain configurations
+
+================================================
+📁 CORE/ - SHARED CORE MODULES
+================================================
+
+src/core/
+│
+├── 📁 components/                  # Shared UI Components
+│   ├── 📁 ui/                      # shadcn/ui components
+│   │   ├── 📄 button.tsx
+│   │   ├── 📄 input.tsx
+│   │   ├── 📄 card.tsx
+│   │   ├── 📄 badge.tsx
+│   │   ├── 📄 dialog.tsx
+│   │   ├── 📄 dropdown-menu.tsx
+│   │   ├── 📄 select.tsx
+│   │   ├── 📄 toast.tsx
+│   │   ├── 📄 skeleton.tsx
+│   │   └── 📄 ...
+│   │
+│   ├── 📁 layout/
+│   │   ├── 📄 Header.tsx
+│   │   ├── 📄 Footer.tsx
+│   │   ├── 📄 Navbar.tsx
+│   │   └── 📄 Sidebar.tsx
+│   │
+│   └── 📁 common/
+│       ├── 📄 Logo.tsx
+│       ├── 📄 LoadingSpinner.tsx
+│       ├── 📄 ErrorMessage.tsx
+│       ├── 📄 EmptyState.tsx
+│       └── 📄 Breadcrumbs.tsx
+│
+├── 📁 hooks/                       # Shared Hooks
+│   ├── 📄 useDebounce.ts
+│   ├── 📄 useLocalStorage.ts
+│   ├── 📄 useMediaQuery.ts
+│   ├── 📄 useClickOutside.ts
+│   └── 📄 useToast.ts
+│
+├── 📁 utils/                       # Shared Utilities
+│   ├── 📄 cn.ts                    # Tailwind className merge
+│   ├── 📄 formatters.ts            # Format dates, currency, etc.
+│   ├── 📄 validators.ts            # Common validation functions
+│   ├── 📄 constants.ts             # App-wide constants
+│   └── 📄 helpers.ts               # General helper functions
+│
+├── 📁 types/                       # Shared Types
+│   ├── 📄 common.ts                # Common types (ID, Timestamp, etc.)
+│   ├── 📄 api.ts                   # API request/response types
+│   └── 📄 env.ts                   # Environment variable types
+│
+└── 📁 providers/                   # React Context Providers
+    ├── 📄 ReduxProvider.tsx        # Redux store provider
+    ├── 📄 ThemeProvider.tsx        # Theme provider (dark/light)
+    └── 📄 ToastProvider.tsx        # Toast notification provider
+
+================================================
+📁 INFRASTRUCTURE/ - INFRASTRUCTURE LAYER
+================================================
+
+src/infrastructure/
+│
+├── 📁 database/                    # Database Layer
+│   ├── 📄 supabase.ts              # Supabase client
+│   ├── 📄 schema.ts                # Database schema types
+│   └── 📁 repositories/            # Data access layer
+│       ├── 📄 userRepository.ts
+│       ├── 📄 productRepository.ts
+│       ├── 📄 cartRepository.ts
+│       ├── 📄 orderRepository.ts
+│       ├── 📄 chatRepository.ts
+│       └── 📄 haggleRepository.ts
+│
+├── 📁 http/                        # HTTP Client
+│   ├── 📄 client.ts                # Axios/fetch wrapper
+│   ├── 📄 interceptors.ts          # Request/response interceptors
+│   └── 📄 errorHandler.ts          # Global error handling
+│
+├── 📁 auth/                        # Authentication Infrastructure
+│   ├── 📄 jwt.ts                   # JWT utilities
+│   ├── 📄 middleware.ts            # Auth middleware for API routes
+│   └── 📄 session.ts               # Session management
+│
+├── 📁 storage/                     # Storage Services
+│   ├── 📄 localStorage.ts          # Browser localStorage wrapper
+│   └── 📄 sessionStorage.ts        # Browser sessionStorage wrapper
+│
+└── 📁 config/                      # Infrastructure Config
+    ├── 📄 env.ts                   # Environment variables
+    └── 📄 app.ts                   # App-wide configuration
+
+================================================
+📁 STORE/ - GLOBAL STATE MANAGEMENT
+================================================
+
+src/store/
+├── 📄 index.ts                     # Configure & export store
+├── 📄 hooks.ts                     # Typed useAppDispatch, useAppSelector
+├── 📄 rootReducer.ts               # Combine all feature slices
+│
+└── 📁 middleware/
+    ├── 📄 localStorageMiddleware.ts # Persist cart to localStorage
+    ├── 📄 loggerMiddleware.ts      # Log Redux actions (dev only)
+    └── 📄 errorMiddleware.ts       # Global error handling
+
+Note: Feature slices live in their respective feature folders
+Example: src/features/cart/store/cartSlice.ts
+
+================================================
+📁 PUBLIC/ - STATIC ASSETS
+================================================
+
+public/
+├── 📁 images/
+│   ├── 📁 products/
+│   ├── 📁 categories/
+│   └── 📁 icons/
+├── 📁 fonts/                       # Custom fonts (if needed)
+├── 📄 favicon.ico
+├── 📄 next.svg
+└── 📄 vercel.svg
+
+================================================
+🔧 SCRIPTS/ - UTILITY SCRIPTS (OPTIONAL)
+================================================
+
+scripts/
+├── 📄 generateEmbeddings.ts        # Generate product embeddings
+├── 📄 seedDatabase.ts              # Seed initial data
+└── 📄 migrateDatabase.ts           # Run database migrations
+
+================================================
+KEY MODULE EXPLANATIONS
+================================================
+
+🎯 FEATURE MODULES (src/features/)
+- Each feature is self-contained (components, hooks, services, state)
+- Export a clean public API via index.ts
+- Can be imported like: import { useAuth } from '@/features/auth'
+- Easy to enable/disable features by removing folders
+
+🤖 LANGCHAIN MODULES (src/langchain/)
+- Agents: High-level AI agents for different tasks
+- Chains: Composable LangChain chains
+- Tools: Individual tools that AI can call
+- Prompts: Reusable prompt templates
+- Embeddings: Vector generation and search
+- Memory: Conversation and context storage
+
+⚙️ CORE MODULES (src/core/)
+- Shared UI components (design system)
+- Common hooks and utilities
+- Providers for global state/context
+
+🏗️ INFRASTRUCTURE (src/infrastructure/)
+- Database access layer (repositories)
+- HTTP client with interceptors
+- Auth middleware and JWT handling
+- Storage wrappers
+
+================================================
+DEPENDENCY INJECTION & IMPORTS
+================================================
+
+Import Rules:
+✅ Features can import from: core, infrastructure, langchain
+✅ Core can import from: infrastructure only
+✅ Infrastructure: No imports from features or core
+❌ Features should NOT import from other features directly
+
+Example Imports:
+```typescript
+// In src/features/chat/hooks/useChat.ts
+import { useAppDispatch } from '@/store/hooks'           // Global store
+import { clerkAgent } from '@/langchain/agents'          // LangChain
+import { chatService } from '../services/chatService'    // Same feature
+import { useToast } from '@/core/hooks'                  // Core
+
+// In src/langchain/tools/addToCartTool.ts
+import { cartRepository } from '@/infrastructure/database/repositories'
+import { Product } from '@/features/products/types'
+```
+
+================================================
+DATA FLOW EXAMPLES
+================================================
+
+1️⃣ USER: "Show me linen suits for a summer wedding"
+
+   Flow:
+   ├── User types in ChatInput component
+   ├── hooks/useChat.ts calls chatService.sendMessage()
+   ├── POST /api/chat → langchain/agents/clerkAgent.ts
+   ├── Agent uses langchain/tools/searchProductsTool.ts
+   ├── Tool calls langchain/chains/ragChain.ts
+   ├── RAG chain generates embedding via embeddings/embeddingService.ts
+   ├── Retriever queries Supabase pgvector
+   ├── Returns products → Agent formats response
+   ├── API returns to frontend
+   ├── chatSlice updates with new message
+   ├── ChatMessage component displays results with ChatProductCard
+   └── User clicks product → Navigate to product page
+
+2️⃣ USER: "Show me cheaper options"
+
+   Flow:
+   ├── Message sent to /api/chat
+   ├── clerkAgent identifies intent: filter by price
+   ├── Agent calls langchain/tools/filterProductsTool.ts
+   ├── Tool dispatches Redux action: productsSlice.setSortBy('price_asc')
+   ├── Agent also returns text: "Sorting by price, lowest first!"
+   ├── Frontend:
+   │   ├── productsSlice updates → triggers ProductGrid re-render
+   │   ├── Framer Motion animates product cards rearranging
+   │   └── Chat displays confirmation message
+   └── UI is now sorted by price
+
+3️⃣ USER: "Can I get a discount? It's my birthday!"
+
+   Flow:
+   ├── Message sent to /api/chat
+   ├── clerkAgent detects haggle intent → delegates to haggleAgent
+   ├── haggleAgent uses haggle/utils/sentimentAnalyzer.ts
+   ├── Sentiment: 0.8 (polite), reason: "birthday"
+   ├── Agent calls tools/hagglePriceTool.ts
+   ├── Tool uses haggle/utils/priceCalculator.ts
+   ├── Calculate: 15% discount (polite + special occasion)
+   ├── Tool calls haggle/utils/codeGenerator.ts → "BDAY-15"
+   ├── Tool saves to haggle_sessions + discount_codes tables
+   ├── Agent responds: "Happy birthday! Here's 15% off: BDAY-15"
+   ├── Frontend displays discount code in chat
+   ├── User can click "Apply to Cart"
+   ├── Calls tools/applyDiscountTool.ts
+   ├── Updates cartSlice with discount
+   └── Cart page shows new total
+
+================================================
+LANGCHAIN TOOL EXAMPLE
+================================================
+
+File: src/langchain/tools/addToCartTool.ts
+
+```typescript
+import { DynamicStructuredTool } from 'langchain/tools'
+import { z } from 'zod'
+import { cartRepository } from '@/infrastructure/database/repositories'
+
+export const addToCartTool = new DynamicStructuredTool({
+  name: 'add_to_cart',
+  description: 'Add a product to the user cart',
+  schema: z.object({
+    productId: z.string().describe('The product ID to add'),
+    quantity: z.number().default(1).describe('Quantity to add'),
+    variantId: z.string().optional().describe('Product variant ID'),
+  }),
+  func: async ({ productId, quantity, variantId }, { sessionId }) => {
+    const result = await cartRepository.addItem({
+      sessionId,
+      productId,
+      quantity,
+      variantId,
+    })
+
+    return `Added ${quantity}x product to cart. Cart now has ${result.totalItems} items.`
+  },
+})
+```
+
+================================================
+MODULAR FEATURES - HOW TO ADD/REMOVE
+================================================
+
+Adding a new feature (e.g., "Wishlist"):
+
+1. Create src/features/wishlist/
+2. Add components, hooks, services, store, types
+3. Export public API in src/features/wishlist/index.ts
+4. Import in app pages: import { WishlistButton } from '@/features/wishlist'
+5. Add to Redux: import wishlistSlice in src/store/rootReducer.ts
+
+Removing a feature:
+
+1. Delete src/features/wishlist/
+2. Remove from rootReducer.ts
+3. Remove API routes in src/app/api/wishlist/
+4. Remove any imports from other files
+
+================================================
+ENVIRONMENT VARIABLES (.env.local)
+================================================
+
+# Gemini AI
+GEMINI_API_KEY=your_gemini_api_key
+
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_key
+
+# Authentication
+JWT_SECRET=your_jwt_secret
+JWT_EXPIRATION=7d
+
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+================================================
+HACKATHON SCORING CHECKLIST
+================================================
+
+✅ Clerk Personality (30 points)
+   └── langchain/prompts/clerkPersonality.ts - Funny, helpful AI
+   └── langchain/agents/clerkAgent.ts - Main agent logic
+
+✅ Visual Polish (30 points)
+   └── tailwind.config.ts - Apply color scheme
+   └── core/components/ui/ - shadcn components
+   └── Framer Motion in ProductGrid, ChatWidget
+
+✅ UI Integration (20 points)
+   └── langchain/tools/filterProductsTool.ts - Update Redux from chat
+   └── langchain/tools/addToCartTool.ts - Add to cart from chat
+   └── features/products/store/productsSlice.ts - State updates
+
+✅ Haggle Logic (20 points)
+   └── langchain/agents/haggleAgent.ts - Negotiation agent
+   └── features/haggle/utils/sentimentAnalyzer.ts - Detect tone
+   └── features/haggle/utils/priceCalculator.ts - Dynamic pricing
+   └── features/haggle/utils/codeGenerator.ts - Generate codes
+
+================================================
+DEVELOPMENT WORKFLOW
+================================================
+
+1. Clone repo
+2. Create .env.local with API keys
+3. npm install
+4. Set up Supabase + run schema.txt SQL
+5. npm run generate-embeddings (script to embed products)
+6. npm run dev
+7. Test features:
+   - Chat: "Show me products"
+   - RAG: "Something for a beach vacation"
+   - Haggle: "Can I get a discount?"
+   - UI Integration: "Show me cheaper options"
+8. Deploy to Vercel
+
+================================================
+PACKAGE.JSON SCRIPTS
+================================================
+
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "generate-embeddings": "tsx scripts/generateEmbeddings.ts",
+    "seed": "tsx scripts/seedDatabase.ts"
+  }
+}
+
+================================================
+END OF MODULAR FILE STRUCTURE
+================================================

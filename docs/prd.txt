@@ -1,0 +1,147 @@
+Here is your properly formatted version:
+
+---
+
+# 🛍️ AI Personal Shopper Hackathon Challenge
+
+---
+
+## 1. The Problem
+
+Websites used in e-commerce are dull. They are mere collections of fixed pictures. There is no one to consult, no one to bargain with, and no human touch.
+
+### 🎯 Your Mission
+
+Create an e-commerce site (using Shopify, Next.js, or any template you like) that includes an **AI Personal Shopper**.
+
+This AI should not just chat — it must be able to **manage the site and assist users in purchasing items**.
+
+---
+
+## 2. The Core Requirements (Must Haves)
+
+---
+
+### A. The Storefront (The Body)
+
+we are making a custom backend
+
+#### ✅ Requirement
+
+The site must look **professional** and include:
+
+* Product List
+* Cart
+* Checkout Page
+
+---
+
+### B. The RAG-Based Agent (The Clerk)
+
+You must embed an AI Assistant (**The Clerk**) that has access to the inventory.
+
+#### 🚫 The “No-Menu” Rule
+
+A user must also be able to find and buy a product **without clicking a single add-to-cart/buy button**, just by talking to the Clerk.
+
+---
+
+### 🧠 Capabilities
+
+1. **Semantic Search**
+   Example:
+
+   > “I need an outfit for a summer wedding in Italy.”
+   > The Clerk must suggest light linens and sunglasses — not winter coats.
+
+2. **Inventory Check**
+   Example:
+
+   > “Do you have this in blue?”
+   > The Clerk checks the JSON/database and answers accurately.
+
+3. **Defined User Journey**
+   When the Clerk responds with products, it must:
+
+   * Display rich product results (schema)
+   * Show basic info (reviews, price, etc.)
+   * Include a hyperlink to the specific product page
+
+---
+
+### C. The Real Value Addition
+
+The Clerk should not just talk — it must act.
+
+#### 🎨 The “Vibe Filter”
+
+If the user says:
+
+> “Show me cheaper options.”
+
+The website UI must update instantly to sort by price.
+
+The chatbot must trigger a function that changes the website layout in real time.
+
+---
+
+#### 🛒 Sales Agent Mode
+
+The agent must recommend relevant products based on the user’s past activity data.
+
+---
+
+## 3. The “Haggle Mode”
+
+### 🎭 The Scenario
+
+Users love personalized deals. Most impressive sales figures are achieved through hyper-personalization.
+
+You must build a **Negotiation Bot** feature.
+
+---
+
+### 💬 The Task
+
+The user can ask the Clerk for a discount.
+
+---
+
+### 🧠 The Logic
+
+The Clerk has a hidden **“Bottom Price.”**
+
+* If the user gives a good reason
+  (e.g., “It’s my birthday” or “I’m buying two”),
+  the Clerk generates a unique coupon code and applies it to the cart.
+
+* If the user is rude,
+  the Clerk raises the price.
+
+---
+
+### ⚙️ Tech Requirement
+
+Use OpenAI Function Calling to:
+
+* Generate a code like `BDAY-20`
+* Inject it into the cart session
+
+---
+
+## 4. Scoring Rubric (Total: 100 Points)
+
+---
+
+## 🏆 Evaluation Criteria
+
+| Category                | Points | Success Criteria                                                                  |
+| ----------------------- | ------ | --------------------------------------------------------------------------------- |
+| The "Clerk" Personality | 30     | Is the bot helpful/funny, or does it feel robotic?                                |
+| Visual Polish           | 30     | Does the store look trustworthy? (Good images, clean fonts)                       |
+| UI Integration          | 20     | Does the chat actually change the website? (Filters products, adds to cart, etc.) |
+| "Haggle" Logic          | 20     | Can I negotiate a discount? Does the bot have a spine (refuses lowball offers)?   |
+
+---
+
+If you want, I can also turn this into a **Notion-ready version**, a **PDF brief**, or a **presentation outline** for your team.
