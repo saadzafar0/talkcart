@@ -22,6 +22,42 @@ export default function CartPage() {
     fetchCart();
   }, []);
 
+  // When chat applies a haggle coupon, refetch and apply it
+  useEffect(() => {
+    function onDiscountApplied() {
+      fetchCart().then((cartData) => {
+        const savedCode = sessionStorage.getItem('discount_code');
+        const savedMeta = sessionStorage.getItem('discount_meta');
+        if (savedCode && savedMeta && cartData) {
+          try {
+            const meta = JSON.parse(savedMeta);
+            let discountAmount = 0;
+            if (meta.discount_type === 'percentage') {
+              discountAmount = cartData.subtotal * (meta.discount_value / 100);
+              if (meta.max_discount_amount && discountAmount > meta.max_discount_amount) {
+                discountAmount = meta.max_discount_amount;
+              }
+            } else if (meta.discount_type === 'fixed') {
+              discountAmount = meta.discount_value;
+            }
+            discountAmount = Math.min(discountAmount, cartData.subtotal);
+            discountAmount = Math.round(discountAmount * 100) / 100;
+            setCart({
+              ...cartData,
+              discount: discountAmount,
+              total: Math.round((cartData.subtotal - discountAmount) * 100) / 100,
+            });
+            setAppliedCode(savedCode);
+          } catch {
+            /* ignore */
+          }
+        }
+      });
+    }
+    window.addEventListener('discount-code-applied', onDiscountApplied);
+    return () => window.removeEventListener('discount-code-applied', onDiscountApplied);
+  }, []);
+
   // Restore and reapply discount when cart loads
   useEffect(() => {
     if (!cart || cart.discount > 0) return; // Already has discount or no cart
@@ -63,12 +99,14 @@ export default function CartPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart?.subtotal]);
 
-  async function fetchCart() {
+  async function fetchCart(): Promise<CartSummary | null> {
     try {
       const res = await fetch('/api/cart');
       if (res.ok) {
         const data = await res.json();
-        setCart(data.data);
+        const cartData = data.data as CartSummary;
+        setCart(cartData);
+        return cartData;
       } else if (res.status === 401) {
         setError('Please log in to view your cart.');
       } else {
@@ -79,6 +117,7 @@ export default function CartPage() {
     } finally {
       setLoading(false);
     }
+    return null;
   }
 
   async function handleUpdateQuantity(itemId: string, quantity: number) {

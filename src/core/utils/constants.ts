@@ -1,5 +1,10 @@
 export const APP_NAME = 'TalkCart';
 
+/** Public API endpoints (no auth required) - use these for store/customer-facing pages */
+export const API = {
+  categories: '/api/categories',
+} as const;
+
 export const PLACEHOLDER_IMAGE = 'https://placehold.co/400x400/E5E3D0/423E37?text=No+Image';
 
 export const SORT_OPTIONS = [

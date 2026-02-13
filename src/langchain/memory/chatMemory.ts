@@ -2,6 +2,16 @@ import { HumanMessage, AIMessage, SystemMessage, BaseMessage } from '@langchain/
 import { createServerSupabase } from '@/lib/supabase/server';
 
 /**
+ * Sanitize assistant messages to prevent the model from re-using old discount
+ * codes or other tool artifacts that might cause hallucination.
+ */
+function sanitizeContent(content: string, role: string): string {
+  if (role !== 'assistant') return content;
+  // Replace old HAGGLE codes so the model doesn't parrot them
+  return content.replace(/HAGGLE-[A-Z0-9]{4,8}/gi, '[DISCOUNT-ALREADY-APPLIED]');
+}
+
+/**
  * Load chat history from the database and convert to LangChain message format.
  * Uses a sliding window of the last N messages to keep token usage bounded.
  */
@@ -28,15 +38,16 @@ export async function createChatMemory(
   }
 
   return messages.map((msg) => {
+    const content = sanitizeContent(msg.content, msg.role);
     switch (msg.role) {
       case 'user':
-        return new HumanMessage(msg.content);
+        return new HumanMessage(content);
       case 'assistant':
-        return new AIMessage(msg.content);
+        return new AIMessage(content);
       case 'system':
-        return new SystemMessage(msg.content);
+        return new SystemMessage(content);
       default:
-        return new HumanMessage(msg.content);
+        return new HumanMessage(content);
     }
   });
 }

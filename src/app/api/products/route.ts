@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { successResponse, errorResponse } from '@/lib/api/response';
+import { normalizeCategorySlug } from '@/core/utils/categorySlug';
 import { productService } from '@/features/products/services/productService';
 import { ProductFilters } from '@/features/products/types';
 
@@ -20,9 +21,10 @@ export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
 
-    // Parse query parameters
+    // Parse query parameters (normalize category for "clothes" → "clothing" etc.)
+    const rawCategory = searchParams.get('category') || undefined;
     const filters: ProductFilters = {
-      category: searchParams.get('category') || undefined,
+      category: rawCategory ? (normalizeCategorySlug(rawCategory) ?? rawCategory) : undefined,
       minPrice: searchParams.get('minPrice') 
         ? parseFloat(searchParams.get('minPrice')!) 
         : undefined,

@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { ProductGrid } from '@/features/products/components/ProductGrid';
 import { ProductFilters } from '@/features/products/components/ProductFilters';
+import { VibeFilterToast } from '@/features/products/components/VibeFilterToast';
 import { LoadingSpinner } from '@/core/components/common/LoadingSpinner';
 import { EmptyState } from '@/core/components/common/EmptyState';
 import { useCartStore } from '@/stores/useCartStore';
@@ -29,6 +30,9 @@ function ProductsContent() {
     page: searchParams.get('page') ? Number(searchParams.get('page')) : 1,
     limit: 20,
   };
+
+  // Use searchParams as a string to reliably detect changes (including from chat navigation)
+  const searchParamsKey = searchParams.toString();
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -68,7 +72,8 @@ function ProductsContent() {
     } finally {
       setLoading(false);
     }
-  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParamsKey]);
 
   useEffect(() => {
     fetchProducts();
@@ -120,6 +125,8 @@ function ProductsContent() {
       </div>
 
       <ProductFilters filters={filters} onFiltersChange={handleFiltersChange} />
+
+      <VibeFilterToast />
 
       {error && (
         <div className="mt-4 flex items-center gap-2 rounded-lg border border-error-500/30 bg-error-500/10 px-4 py-3 text-sm text-error-600">

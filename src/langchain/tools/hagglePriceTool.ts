@@ -5,7 +5,7 @@ import { haggleService } from '@/features/haggle/services/haggleService';
 export const hagglePriceTool = new DynamicStructuredTool({
   name: 'haggle_price',
   description:
-    'Negotiate a discount on a product based on user reasoning. Use when the customer asks for a deal, discount, or better price. The product_id comes from your recent search results - use the ID of the product they\'re interested in.',
+    'Negotiate a discount on a product. ONLY use when the customer EXPLICITLY asks to negotiate, haggle, get a discount, or make a deal. Do NOT use for filters, search, or browse. Good reasons (birthday, bulk) may get a coupon. Rude customers may get a price RAISE. Lowballs are refused.',
   schema: z.object({
     product_id: z.string().describe('The UUID of the product to negotiate on (from your search results)'),
     message: z.string().describe("The user's haggle message or reason for discount"),

@@ -1,5 +1,6 @@
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
+import { normalizeCategorySlug } from '@/core/utils/categorySlug';
 import { productService } from '@/features/products/services/productService';
 
 export const filterProductsTool = new DynamicStructuredTool({
@@ -7,7 +8,7 @@ export const filterProductsTool = new DynamicStructuredTool({
   description:
     'Filter products by category, price range, or sort order. Use this when the customer wants to browse by specific criteria like "shoes under $100" or "sort by rating".',
   schema: z.object({
-    category: z.string().optional().describe('Category name or slug to filter by'),
+    category: z.string().optional().describe('Category slug: clothing, fashion, electronics, home-kitchen, home-living, sports-outdoors, books-stationery, beauty-personal-care. Also accepts: clothes, apparel, tech, home, kitchen, living, sports, beauty, etc.'),
     min_price: z.number().optional().describe('Minimum price filter'),
     max_price: z.number().optional().describe('Maximum price filter'),
     sort_by: z
@@ -19,8 +20,9 @@ export const filterProductsTool = new DynamicStructuredTool({
   }),
   func: async ({ category, min_price, max_price, sort_by, limit }) => {
     try {
+      const categorySlug = category ? normalizeCategorySlug(category) : undefined;
       const result = await productService.getAll({
-        category,
+        category: categorySlug ?? category,
         minPrice: min_price,
         maxPrice: max_price,
         sortBy: sort_by,

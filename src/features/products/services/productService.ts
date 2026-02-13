@@ -1,4 +1,5 @@
 import { createServerSupabase } from '@/lib/supabase/server';
+import { normalizeCategorySlug } from '@/core/utils/categorySlug';
 import { Product, ProductFilters, ProductSearchResult } from '../types';
 
 export const productService = {
@@ -26,15 +27,17 @@ export const productService = {
 
     // Apply filters
     if (category) {
-      // Get category by slug
-      const { data: categoryData } = await supabase
-        .from('categories')
-        .select('id')
-        .eq('slug', category)
-        .single();
-      
-      if (categoryData) {
-        query = query.eq('category_id', categoryData.id);
+      const slug = normalizeCategorySlug(category);
+      if (slug) {
+        const { data: categoryData } = await supabase
+          .from('categories')
+          .select('id')
+          .eq('slug', slug)
+          .single();
+
+        if (categoryData) {
+          query = query.eq('category_id', categoryData.id);
+        }
       }
     }
 
