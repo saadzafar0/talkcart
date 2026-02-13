@@ -5,9 +5,9 @@ import { productService } from '@/features/products/services/productService';
 export const checkStockTool = new DynamicStructuredTool({
   name: 'check_stock',
   description:
-    'Check if a product is in stock and how many are available. Use this when the customer asks about availability, sizes, or colors.',
+    'Check if a product is in stock and how many are available. Use when customer asks about availability, sizes, or colors. The product_id comes from your search results.',
   schema: z.object({
-    product_id: z.string().describe('The UUID of the product to check stock for'),
+    product_id: z.string().describe('The UUID of the product to check (from your search results)'),
     variant_id: z.string().optional().describe('Optional variant UUID (for specific color/size)'),
   }),
   func: async ({ product_id, variant_id }) => {

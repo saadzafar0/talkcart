@@ -10,6 +10,14 @@ import { LoadingSpinner } from '@/core/components/common/LoadingSpinner';
 import { EmptyState } from '@/core/components/common/EmptyState';
 import type { CartSummary } from '@/features/cart/types';
 
+interface DiscountInfo {
+  code: string;
+  discount_type: 'percentage' | 'fixed';
+  discount_value: number;
+  max_discount_amount: number | null;
+  amount: number;
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const [cart, setCart] = useState<CartSummary | null>(null);
@@ -31,6 +39,7 @@ export default function CheckoutPage() {
   const [shippingMethod, setShippingMethod] = useState<'standard' | 'express'>('standard');
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [notes, setNotes] = useState('');
+  const [discount, setDiscount] = useState<DiscountInfo | null>(null);
 
   const shippingCost = shippingMethod === 'express' ? 15.0 : 5.0;
 
@@ -57,6 +66,60 @@ export default function CheckoutPage() {
     fetchCart();
   }, [router]);
 
+  // Validate discount code on mount if one is stored
+  useEffect(() => {
+    async function validateDiscount() {
+      if (!cart) return;
+      const storedCode = typeof window !== 'undefined' ? sessionStorage.getItem('discount_code') : null;
+      if (!storedCode) return;
+
+      // Calculate estimated discount client-side from stored metadata
+      // The server will re-validate on order creation
+      const storedMeta = typeof window !== 'undefined' ? sessionStorage.getItem('discount_meta') : null;
+      if (storedMeta) {
+        try {
+          const meta = JSON.parse(storedMeta);
+          let amount = 0;
+          if (meta.discount_type === 'percentage') {
+            amount = cart.subtotal * (meta.discount_value / 100);
+            if (meta.max_discount_amount && amount > meta.max_discount_amount) {
+              amount = meta.max_discount_amount;
+            }
+          } else {
+            amount = meta.discount_value;
+          }
+          amount = Math.min(Math.round(amount * 100) / 100, cart.subtotal);
+          setDiscount({
+            code: storedCode,
+            discount_type: meta.discount_type,
+            discount_value: meta.discount_value,
+            max_discount_amount: meta.max_discount_amount,
+            amount,
+          });
+        } catch {
+          // If meta is invalid, just show the code without preview amount
+          setDiscount({
+            code: storedCode,
+            discount_type: 'percentage',
+            discount_value: 0,
+            max_discount_amount: null,
+            amount: 0,
+          });
+        }
+      } else {
+        // Have a code but no metadata — show it and let server calculate
+        setDiscount({
+          code: storedCode,
+          discount_type: 'percentage',
+          discount_value: 0,
+          max_discount_amount: null,
+          amount: 0,
+        });
+      }
+    }
+    validateDiscount();
+  }, [cart]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!cart) return;
@@ -78,7 +141,16 @@ export default function CheckoutPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          shipping_address_id: 'inline',
+          shipping_address: {
+            full_name: address.full_name,
+            phone: address.phone,
+            address_line1: address.address_line1,
+            address_line2: address.address_line2 || undefined,
+            city: address.city,
+            state: address.state,
+            postal_code: address.postal_code,
+            country: address.country,
+          },
           shipping_method: shippingMethod,
           payment_method: paymentMethod,
           discount_code: discountCode || undefined,
@@ -93,9 +165,20 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Clear stored discount code
+      // Track purchase activity (fire and forget)
+      fetch('/api/activity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          activity_type: 'purchase',
+          metadata: { order_number: data.data.order_number },
+        }),
+      }).catch(() => {});
+
+      // Clear stored discount code and metadata
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem('discount_code');
+        sessionStorage.removeItem('discount_meta');
       }
 
       router.push(`/checkout/success?order=${data.data.order_number}`);
@@ -261,7 +344,8 @@ export default function CheckoutPage() {
             <CheckoutOrderSummary
               cart={cart}
               shippingCost={shippingCost}
-              discountAmount={0}
+              discountAmount={discount?.amount ?? 0}
+              discountCode={discount?.code}
             />
 
             <button

@@ -30,8 +30,9 @@ export async function POST(req: NextRequest) {
     const response = await chatService.sendMessage(userId, body);
 
     return successResponse(response);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Chat API error:', error);
-    return errorResponse(error.message || 'Failed to process chat message', 500);
+    const message = error instanceof Error ? error.message : 'Failed to process chat message';
+    return errorResponse(message, 500);
   }
 }

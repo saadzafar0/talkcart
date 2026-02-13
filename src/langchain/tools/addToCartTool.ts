@@ -5,9 +5,9 @@ import { cartService } from '@/features/cart/services/cartService';
 export const addToCartTool = new DynamicStructuredTool({
   name: 'add_to_cart',
   description:
-    'Add a product to the shopping cart. Use this when the customer wants to buy something or says "add to cart". Requires the user to be authenticated.',
+    'Add a product to the shopping cart. Use this when the customer wants to buy something or says "add to cart", "I\'ll take it", "add that", etc. The product_id comes from your recent search/filter results - NEVER ask the customer for it. If showing multiple products, use the ID of the specific product they reference by name or position.',
   schema: z.object({
-    product_id: z.string().describe('The UUID of the product to add'),
+    product_id: z.string().describe('The UUID of the product to add (from your search results)'),
     variant_id: z.string().optional().describe('Optional variant UUID for specific color/size'),
     quantity: z.number().optional().default(1).describe('Quantity to add (default: 1)'),
     user_id: z.string().describe('The authenticated user ID'),
@@ -36,16 +36,17 @@ export const addToCartTool = new DynamicStructuredTool({
           total: cart.total,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Add to cart tool error:', error);
 
-      if (error.message?.includes('not found')) {
+      const errMsg = error instanceof Error ? error.message : '';
+      if (errMsg.includes('not found')) {
         return JSON.stringify({
           success: false,
           message: 'Product not found.',
         });
       }
-      if (error.message?.includes('stock')) {
+      if (errMsg.includes('stock')) {
         return JSON.stringify({
           success: false,
           message: 'Sorry, this product is out of stock or insufficient quantity available.',

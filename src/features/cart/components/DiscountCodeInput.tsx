@@ -1,15 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Tag, Check, AlertCircle } from 'lucide-react';
+import { Tag, Check, AlertCircle, X } from 'lucide-react';
 
 interface DiscountCodeInputProps {
   onApply: (code: string) => void;
+  onRemove?: () => void;
   appliedCode?: string;
   error?: string;
 }
 
-export function DiscountCodeInput({ onApply, appliedCode, error }: DiscountCodeInputProps) {
+export function DiscountCodeInput({ onApply, onRemove, appliedCode, error }: DiscountCodeInputProps) {
   const [code, setCode] = useState('');
 
   function handleSubmit(e: React.FormEvent) {
@@ -21,11 +22,22 @@ export function DiscountCodeInput({ onApply, appliedCode, error }: DiscountCodeI
 
   if (appliedCode) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-success-600/30 bg-success-600/10 px-4 py-3 text-sm">
-        <Check className="h-4 w-4 text-success-600" />
-        <span className="font-medium text-success-600">
-          Code &ldquo;{appliedCode}&rdquo; applied
-        </span>
+      <div className="flex items-center justify-between rounded-lg border border-success-600/30 bg-success-600/10 px-4 py-3 text-sm">
+        <div className="flex items-center gap-2">
+          <Check className="h-4 w-4 text-success-600" />
+          <span className="font-medium text-success-600">
+            Code &ldquo;{appliedCode}&rdquo; applied
+          </span>
+        </div>
+        {onRemove && (
+          <button
+            onClick={onRemove}
+            className="text-success-600 hover:text-success-700 transition-colors"
+            title="Remove discount code"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
     );
   }

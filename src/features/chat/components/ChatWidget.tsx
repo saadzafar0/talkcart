@@ -1,28 +1,16 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { MessageCircle, X, Minimize2, Maximize2 } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { ChatTypingIndicator } from './ChatTypingIndicator';
 import { ChatSuggestions } from './ChatSuggestions';
-import type { MessageRole } from '@/features/chat/types';
-
-interface LocalMessage {
-  id: string;
-  role: MessageRole;
-  content: string;
-  products?: Array<{
-    id: string;
-    name: string;
-    slug: string;
-    base_price: number;
-    image_url?: string | null;
-    rating?: number;
-    review_count?: number;
-    stock_quantity?: number;
-  }>;
-}
+import { buildFilterUrl } from '@/features/chat/utils/buildFilterUrl';
+import { useCartStore } from '@/stores/useCartStore';
+import { useChatStore } from '@/stores/useChatStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 const DEFAULT_SUGGESTIONS = [
   'Show me products',
@@ -32,19 +20,36 @@ const DEFAULT_SUGGESTIONS = [
 ];
 
 export function ChatWidget() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [messages, setMessages] = useState<LocalMessage[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content:
-        "Hey there! I'm your AI shopping clerk. I can help you find products, add items to your cart, check stock, and even negotiate prices. What are you looking for today?",
-    },
-  ]);
+  const router = useRouter();
+  const user = useAuthStore((s) => s.user);
+  const isOpen = useChatStore((s) => s.isOpen);
+  const setOpen = useChatStore((s) => s.setOpen);
+  const isMinimized = useChatStore((s) => s.isMinimized);
+  const setMinimized = useChatStore((s) => s.setMinimized);
+  const messages = useChatStore((s) => s.messages);
+  const addMessage = useChatStore((s) => s.addMessage);
+  const sessionId = useChatStore((s) => s.sessionId);
+  const setSessionId = useChatStore((s) => s.setSessionId);
+  const currentUserId = useChatStore((s) => s.currentUserId);
+  const setCurrentUserId = useChatStore((s) => s.setCurrentUserId);
+  const clearChat = useChatStore((s) => s.clearChat);
   const [isTyping, setIsTyping] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Clear chat if user changes (login/logout/switch account)
+  useEffect(() => {
+    const newUserId = user?.id || null;
+    
+    // If user changed (not initial load), clear chat
+    if (currentUserId !== null && currentUserId !== newUserId) {
+      clearChat();
+    }
+    
+    // Always update current user ID
+    if (currentUserId !== newUserId) {
+      setCurrentUserId(newUserId);
+    }
+  }, [user?.id, currentUserId, clearChat, setCurrentUserId]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -53,12 +58,11 @@ export function ChatWidget() {
   }, [messages, isTyping]);
 
   async function handleSend(content: string) {
-    const userMessage: LocalMessage = {
+    addMessage({
       id: `user-${Date.now()}`,
       role: 'user',
       content,
-    };
-    setMessages((prev) => [...prev, userMessage]);
+    });
     setIsTyping(true);
 
     try {
@@ -80,32 +84,39 @@ export function ChatWidget() {
           setSessionId(responseData.session_id);
         }
 
-        const assistantMessage: LocalMessage = {
+        addMessage({
           id: `assistant-${Date.now()}`,
           role: 'assistant',
           content: responseData.message?.content || responseData.message || "I'm sorry, I couldn't process that. Could you try again?",
           products: responseData.products || [],
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
+        });
+
+        // Vibe Filter: if agent used filter/search tools, navigate products page
+        const actions = responseData.actions;
+        if (actions && Array.isArray(actions)) {
+          const filterUrl = buildFilterUrl(actions);
+          if (filterUrl) {
+            router.push(filterUrl);
+          }
+
+          // Sync cart badge if agent added items to cart
+          if (actions.some((a: { name: string }) => a.name === 'add_to_cart')) {
+            useCartStore.getState().fetchCount();
+          }
+        }
       } else {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `error-${Date.now()}`,
-            role: 'assistant',
-            content: "I'm having trouble connecting right now. Please try again in a moment.",
-          },
-        ]);
-      }
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
+        addMessage({
           id: `error-${Date.now()}`,
           role: 'assistant',
           content: "I'm having trouble connecting right now. Please try again in a moment.",
-        },
-      ]);
+        });
+      }
+    } catch {
+      addMessage({
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: "I'm having trouble connecting right now. Please try again in a moment.",
+      });
     } finally {
       setIsTyping(false);
     }
@@ -120,34 +131,26 @@ export function ChatWidget() {
       });
 
       if (res.ok) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `cart-${Date.now()}`,
-            role: 'assistant',
-            content: 'Added to your cart! You can view your cart anytime or keep shopping.',
-          },
-        ]);
+        useCartStore.getState().fetchCount();
+        addMessage({
+          id: `cart-${Date.now()}`,
+          role: 'assistant',
+          content: 'Added to your cart! You can view your cart anytime or keep shopping.',
+        });
       } else {
         const data = await res.json();
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `cart-error-${Date.now()}`,
-            role: 'assistant',
-            content: data.error || 'Could not add to cart. You may need to sign in first.',
-          },
-        ]);
-      }
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
+        addMessage({
           id: `cart-error-${Date.now()}`,
           role: 'assistant',
-          content: 'Something went wrong while adding to cart.',
-        },
-      ]);
+          content: data.error || 'Could not add to cart. You may need to sign in first.',
+        });
+      }
+    } catch {
+      addMessage({
+        id: `cart-error-${Date.now()}`,
+        role: 'assistant',
+        content: 'Something went wrong while adding to cart.',
+      });
     }
   }
 
@@ -155,7 +158,7 @@ export function ChatWidget() {
   if (!isOpen) {
     return (
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={() => setOpen(true)}
         className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-accent-600 text-primary-900 shadow-lg transition-all hover:bg-accent-500 hover:shadow-xl"
         style={{ boxShadow: '0 4px 20px rgba(227, 178, 60, 0.3)' }}
       >
@@ -190,13 +193,13 @@ export function ChatWidget() {
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setIsMinimized(!isMinimized)}
+            onClick={() => setMinimized(!isMinimized)}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 transition-colors hover:bg-white/10 hover:text-neutral-200"
           >
             {isMinimized ? <Maximize2 className="h-3.5 w-3.5" /> : <Minimize2 className="h-3.5 w-3.5" />}
           </button>
           <button
-            onClick={() => setIsOpen(false)}
+            onClick={() => setOpen(false)}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 transition-colors hover:bg-white/10 hover:text-neutral-200"
           >
             <X className="h-4 w-4" />

@@ -1,4 +1,4 @@
-import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
+import { StructuredToolInterface } from '@langchain/core/tools';
 import {
   BaseMessage,
   HumanMessage,
@@ -31,8 +31,7 @@ export async function clerkAgent(
 ): Promise<ClerkAgentResult> {
   const llm = createGeminiLLM(0.7);
   const llmWithTools = llm.bindTools(allTools);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const toolsByName = new Map<string, any>(allTools.map((t) => [t.name, t]));
+  const toolsByName = new Map<string, StructuredToolInterface>(allTools.map((t) => [t.name, t]));
 
   const collectedToolCalls: { name: string; args: Record<string, unknown> }[] = [];
 
@@ -72,10 +71,10 @@ export async function clerkAgent(
 
       if (tool) {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          result = await (tool as any).invoke(tc.args);
-        } catch (err: any) {
-          result = JSON.stringify({ error: err.message || 'Tool execution failed' });
+          result = await tool.invoke(tc.args);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Tool execution failed';
+          result = JSON.stringify({ error: message });
         }
       } else {
         result = JSON.stringify({ error: `Unknown tool: ${tc.name}` });

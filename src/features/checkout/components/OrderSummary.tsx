@@ -7,9 +7,10 @@ interface CheckoutOrderSummaryProps {
   cart: CartSummary;
   shippingCost: number;
   discountAmount: number;
+  discountCode?: string;
 }
 
-export function CheckoutOrderSummary({ cart, shippingCost, discountAmount }: CheckoutOrderSummaryProps) {
+export function CheckoutOrderSummary({ cart, shippingCost, discountAmount, discountCode }: CheckoutOrderSummaryProps) {
   const taxRate = 0.08;
   const taxableAmount = cart.subtotal - discountAmount;
   const tax = Math.round(taxableAmount * taxRate * 100) / 100;
@@ -53,8 +54,16 @@ export function CheckoutOrderSummary({ cart, shippingCost, discountAmount }: Che
         </div>
         {discountAmount > 0 && (
           <div className="flex justify-between text-sm">
-            <span className="text-success-600">Discount</span>
+            <span className="text-success-600">
+              Discount{discountCode ? ` (${discountCode})` : ''}
+            </span>
             <span className="text-success-600">-{formatPrice(discountAmount)}</span>
+          </div>
+        )}
+        {discountCode && discountAmount === 0 && (
+          <div className="flex justify-between text-sm">
+            <span className="text-success-600">Code: {discountCode}</span>
+            <span className="text-success-600 text-xs">Applied at checkout</span>
           </div>
         )}
         <div className="flex justify-between text-sm">
