@@ -6,6 +6,7 @@ const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '7d';
 export interface JwtPayload {
   userId: string;
   email: string;
+  role: 'customer' | 'admin';
 }
 
 export async function signToken(payload: JwtPayload): Promise<string> {
