@@ -1,0 +1,869 @@
+{
+  "info": {
+    "name": "TalkCart - Cart API",
+    "_postman_id": "talkcart-cart-api",
+    "description": "API collection for testing TalkCart's Shopping Cart endpoints. Includes get cart, add items, remove items, and cart management operations.\n\n**Authentication Required**: All endpoints require JWT authentication via cookie or Authorization header.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testItemId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testProductId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Cart Operations",
+      "item": [
+        {
+          "name": "Get Cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has success field\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test(\"Response has cart data structure\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('items');",
+                  "    pm.expect(jsonData.data).to.have.property('subtotal');",
+                  "    pm.expect(jsonData.data).to.have.property('discount');",
+                  "    pm.expect(jsonData.data).to.have.property('total');",
+                  "    pm.expect(jsonData.data).to.have.property('item_count');",
+                  "});",
+                  "",
+                  "pm.test(\"Items is an array\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.items).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test(\"Subtotal and total are numbers\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.subtotal).to.be.a('number');",
+                  "    pm.expect(jsonData.data.total).to.be.a('number');",
+                  "    pm.expect(jsonData.data.item_count).to.be.a('number');",
+                  "});",
+                  "",
+                  "// Save first item ID for remove test",
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data.items.length > 0) {",
+                  "    pm.collectionVariables.set('testItemId', jsonData.data.items[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cart",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cart"]
+            },
+            "description": "Fetches the authenticated user's shopping cart with all items, product details, and calculated totals.\n\n**Response includes:**\n- items: Array of cart items with product details\n- subtotal: Sum of all item prices\n- discount: Applied discount amount (if any)\n- total: Final total after discounts\n- item_count: Total number of items in cart"
+          },
+          "response": [
+            {
+              "name": "Empty Cart",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"items\": [],\n    \"subtotal\": 0,\n    \"discount\": 0,\n    \"total\": 0,\n    \"item_count\": 0\n  }\n}"
+            },
+            {
+              "name": "Cart With Items",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n        \"cart_id\": \"550e8400-e29b-41d4-a716-446655440001\",\n        \"product_id\": \"550e8400-e29b-41d4-a716-446655440002\",\n        \"variant_id\": null,\n        \"quantity\": 2,\n        \"price_at_addition\": 299.99,\n        \"created_at\": \"2024-01-15T10:30:00Z\",\n        \"updated_at\": \"2024-01-15T10:30:00Z\",\n        \"product_name\": \"Italian Linen Summer Suit\",\n        \"product_image\": \"https://images.unsplash.com/photo-1507679799987-c73779587ccf\",\n        \"product_slug\": \"italian-linen-summer-suit\"\n      }\n    ],\n    \"subtotal\": 599.98,\n    \"discount\": 0,\n    \"total\": 599.98,\n    \"item_count\": 2\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Add Item to Cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response indicates success\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test(\"Returns updated cart\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('items');",
+                  "    pm.expect(jsonData.data).to.have.property('subtotal');",
+                  "    pm.expect(jsonData.data).to.have.property('total');",
+                  "});",
+                  "",
+                  "pm.test(\"Cart has at least one item\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.items.length).to.be.at.least(1);",
+                  "});",
+                  "",
+                  "pm.test(\"Item count increased\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.item_count).to.be.at.least(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{testProductId}}\",\n  \"quantity\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cart/add",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cart", "add"]
+            },
+            "description": "Adds a product to the user's cart. If the item already exists, it increases the quantity.\n\n**Request Body:**\n- product_id (required): UUID of the product to add\n- variant_id (optional): UUID of the specific product variant\n- quantity (optional): Number of items to add (default: 1)\n\n**Validations:**\n- Product must exist\n- Sufficient stock must be available\n- Quantity must be positive\n\n**Returns:** Updated cart with all items and totals"
+          },
+          "response": [
+            {
+              "name": "Success - Item Added",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"product_id\": \"550e8400-e29b-41d4-a716-446655440002\",\n  \"quantity\": 2\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart/add",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart", "add"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n        \"cart_id\": \"550e8400-e29b-41d4-a716-446655440001\",\n        \"product_id\": \"550e8400-e29b-41d4-a716-446655440002\",\n        \"variant_id\": null,\n        \"quantity\": 2,\n        \"price_at_addition\": 299.99,\n        \"created_at\": \"2024-01-15T10:30:00Z\",\n        \"updated_at\": \"2024-01-15T10:30:00Z\",\n        \"product_name\": \"Italian Linen Summer Suit\",\n        \"product_image\": \"https://images.unsplash.com/photo-1507679799987-c73779587ccf\",\n        \"product_slug\": \"italian-linen-summer-suit\"\n      }\n    ],\n    \"subtotal\": 599.98,\n    \"discount\": 0,\n    \"total\": 599.98,\n    \"item_count\": 2\n  }\n}"
+            },
+            {
+              "name": "Error - Product Not Found",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"product_id\": \"550e8400-e29b-41d4-a716-999999999999\",\n  \"quantity\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart/add",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart", "add"]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"error\": \"Product not found\"\n}"
+            },
+            {
+              "name": "Error - Insufficient Stock",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"product_id\": \"550e8400-e29b-41d4-a716-446655440002\",\n  \"quantity\": 999\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart/add",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart", "add"]
+                }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"error\": \"Insufficient stock\"\n}"
+            },
+            {
+              "name": "Error - Invalid Request",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"quantity\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart/add",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart", "add"]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"error\": \"product_id is required\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Add Item With Variant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Item added with variant\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    ",
+                  "    // Check if any item has a variant_id",
+                  "    var hasVariant = jsonData.data.items.some(item => item.variant_id !== null);",
+                  "    pm.expect(hasVariant).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{testProductId}}\",\n  \"variant_id\": \"550e8400-e29b-41d4-a716-446655440010\",\n  \"quantity\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cart/add",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cart", "add"]
+            },
+            "description": "Adds a specific product variant to the cart. Useful for products with multiple options (color, size, etc.).\n\n**Request Body:**\n- product_id: The main product UUID\n- variant_id: The specific variant UUID (e.g., \"Blue\" color, \"Large\" size)\n- quantity: Number of items"
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Item from Cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response indicates success\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test(\"Returns updated cart\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('items');",
+                  "    pm.expect(jsonData.data).to.have.property('subtotal');",
+                  "    pm.expect(jsonData.data).to.have.property('total');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Ensure we have a testItemId set",
+                  "if (!pm.collectionVariables.get('testItemId')) {",
+                  "    console.log('Warning: testItemId not set. Run \"Get Cart\" first to populate this variable.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cart/remove/{{testItemId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cart", "remove", "{{testItemId}}"]
+            },
+            "description": "Removes a specific item from the user's cart.\n\n**Path Parameter:**\n- itemId: UUID of the cart item to remove (not the product ID, but the cart_item ID)\n\n**Note:** Run \"Get Cart\" first to populate the testItemId variable with a valid cart item ID.\n\n**Returns:** Updated cart after removal"
+          },
+          "response": [
+            {
+              "name": "Success - Item Removed",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart/remove/550e8400-e29b-41d4-a716-446655440000",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart", "remove", "550e8400-e29b-41d4-a716-446655440000"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"items\": [],\n    \"subtotal\": 0,\n    \"discount\": 0,\n    \"total\": 0,\n    \"item_count\": 0\n  }\n}"
+            },
+            {
+              "name": "Error - Item Not Found",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart/remove/550e8400-e29b-41d4-a716-999999999999",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart", "remove", "550e8400-e29b-41d4-a716-999999999999"]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"error\": \"Cart item not found\"\n}"
+            }
+          ]
+        }
+      ],
+      "description": "Core shopping cart operations including viewing cart contents, adding products, and removing items."
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login (Get Auth Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains token\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('token');",
+                  "    ",
+                  "    // Save token to collection variable",
+                  "    pm.collectionVariables.set('authToken', jsonData.token);",
+                  "});",
+                  "",
+                  "console.log('Auth token saved to collection variables');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login to get JWT token. The token will be automatically saved to the collection variable `authToken` and used in subsequent requests.\n\n**Note:** Update the email and password with valid credentials from your database."
+          },
+          "response": [
+            {
+              "name": "Success - Login",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/login",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "login"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"user\": {\n      \"id\": \"550e8400-e29b-41d4-a716-446655440003\",\n      \"email\": \"test@example.com\",\n      \"full_name\": \"Test User\",\n      \"role\": \"customer\"\n    },\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"\n  }\n}"
+            }
+          ]
+        }
+      ],
+      "description": "Authentication endpoints for obtaining JWT tokens required for cart operations."
+    },
+    {
+      "name": "Test Workflow",
+      "item": [
+        {
+          "name": "1. Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.token) {",
+                  "    pm.collectionVariables.set('authToken', jsonData.data.token);",
+                  "    console.log('✓ Logged in successfully');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. Get Empty Cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Cart is accessible\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('items');",
+                  "    console.log('✓ Cart retrieved: ' + jsonData.data.item_count + ' items');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cart",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cart"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. Get First Product ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.products && jsonData.data.products.length > 0) {",
+                  "    pm.collectionVariables.set('testProductId', jsonData.data.products[0].id);",
+                  "    console.log('✓ Product ID saved: ' + jsonData.data.products[0].name);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?limit=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. Add Product to Cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Product added to cart\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.item_count).to.be.at.least(1);",
+                  "    console.log('✓ Item added. Cart now has ' + jsonData.data.item_count + ' items');",
+                  "    ",
+                  "    // Save first item ID for removal",
+                  "    if (jsonData.data.items.length > 0) {",
+                  "        pm.collectionVariables.set('testItemId', jsonData.data.items[0].id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{testProductId}}\",\n  \"quantity\": 2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cart/add",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cart", "add"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5. Get Updated Cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Cart has items\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.items.length).to.be.at.least(1);",
+                  "    console.log('✓ Cart total: $' + jsonData.data.total.toFixed(2));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cart",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cart"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6. Remove Item from Cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Item removed from cart\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log('✓ Item removed. Cart now has ' + jsonData.data.item_count + ' items');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cart/remove/{{testItemId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cart", "remove", "{{testItemId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "7. Verify Cart Empty",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Cart workflow completed\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log('✓ Workflow complete. Final item count: ' + jsonData.data.item_count);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cart",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cart"]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Complete workflow to test the cart functionality end-to-end. Run these requests in order using the Collection Runner for automated testing.\n\n**Steps:**\n1. Login and get auth token\n2. Check empty cart\n3. Get a product ID from the products API\n4. Add product to cart\n5. Verify cart has items\n6. Remove item from cart\n7. Verify cart is empty again"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global pre-request script",
+          "console.log('Request to: ' + pm.request.url.toString());"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test script",
+          "pm.test(\"Response time is acceptable\", function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});",
+          "",
+          "pm.test(\"Response is JSON\", function () {",
+          "    pm.response.to.be.json;",
+          "});"
+        ]
+      }
+    }
+  ]
+}

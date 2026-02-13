@@ -1,26 +1,126 @@
-# TalkCart Products API - Postman Collection
+# TalkCart API - Postman Collections
 
-This collection contains comprehensive test cases for the TalkCart Products API endpoints.
+This folder contains comprehensive test collections for the TalkCart API endpoints.
+
+## 📦 Available Collections
+
+1. **TalkCart-Products-API.postman_collection.json** - Product catalog endpoints
+2. **TalkCart-Cart-API.postman_collection.json** - Shopping cart endpoints (NEW!)
 
 ## Import Instructions
 
 1. Open Postman
 2. Click **Import** button
-3. Select `TalkCart-Products-API.postman_collection.json`
-4. The collection will appear in your workspace
+3. Select the collection JSON file(s) you want to import
+4. The collection(s) will appear in your workspace
 
 ## Environment Setup
 
-The collection uses a `baseUrl` variable that defaults to `http://localhost:3000`.
+Both collections use variables that can be configured:
 
-### To change the base URL:
+### Collection Variables:
+- `baseUrl` - API base URL (default: `http://localhost:3000`)
+- `authToken` - JWT authentication token (auto-populated after login)
+- `testProductId` - Sample product ID for testing (auto-populated)
+- `testItemId` - Sample cart item ID for testing (auto-populated)
+
+### To change variables:
 
 1. Click on the collection name
 2. Go to the **Variables** tab
-3. Update the `baseUrl` value
+3. Update the values as needed
 4. Save the collection
 
-## API Endpoints
+---
+
+## 🛍️ Cart API Collection
+
+### Authentication Required
+All Cart API endpoints require JWT authentication. Use the **Login** request in the "Authentication" folder to get a token.
+
+### API Endpoints
+
+#### 1. Get Cart (`GET /api/cart`)
+
+Fetches the authenticated user's shopping cart with all items and totals.
+
+**Response includes:**
+- `items[]` - Array of cart items with product details
+- `subtotal` - Sum of all item prices
+- `discount` - Applied discount amount
+- `total` - Final total after discounts
+- `item_count` - Total number of items
+
+**Test Cases:**
+- ✅ Get empty cart
+- ✅ Get cart with items
+- ✅ Validate response structure
+- ✅ Auto-save item IDs for removal tests
+
+---
+
+#### 2. Add to Cart (`POST /api/cart/add`)
+
+Adds a product to the cart or increases quantity if already exists.
+
+**Request Body:**
+```json
+{
+  "product_id": "uuid-here",  // required
+  "variant_id": "uuid-here",   // optional
+  "quantity": 1                // optional, default: 1
+}
+```
+
+**Validations:**
+- ✅ Product must exist
+- ✅ Sufficient stock must be available
+- ✅ Quantity must be positive
+
+**Test Cases:**
+- ✅ Add item successfully
+- ✅ Add item with variant
+- ⚠️ Product not found (404)
+- ⚠️ Insufficient stock (409)
+- ⚠️ Invalid request body (400)
+
+---
+
+#### 3. Remove from Cart (`DELETE /api/cart/remove/:itemId`)
+
+Removes a specific item from the cart.
+
+**Path Parameter:**
+- `itemId` - UUID of the cart item (not product ID!)
+
+**Test Cases:**
+- ✅ Remove item successfully
+- ⚠️ Item not found (404)
+
+---
+
+### 🔄 Test Workflow
+
+The collection includes a **Test Workflow** folder with a complete end-to-end test sequence:
+
+1. **Login** - Get authentication token
+2. **Get Empty Cart** - Verify cart is accessible
+3. **Get First Product ID** - Fetch product from catalog
+4. **Add Product to Cart** - Add item with quantity
+5. **Get Updated Cart** - Verify item was added
+6. **Remove Item from Cart** - Remove the added item
+7. **Verify Cart Empty** - Confirm removal
+
+**To run the complete workflow:**
+1. Click the collection name
+2. Click **Run** button
+3. Select the "Test Workflow" folder
+4. Click **Run TalkCart - Cart API**
+5. Watch the automated tests execute
+
+---
+
+## 📦 Products API Collection
 
 ### 1. Products Listing (`GET /api/products`)
 
