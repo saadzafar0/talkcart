@@ -41,6 +41,8 @@ export const chatService = {
     return {
       message: assistantMessage,
       actions: functionCalls || undefined,
+      products: agentResult.products,
+      discountCode: agentResult.discountCode,
     };
   },
 

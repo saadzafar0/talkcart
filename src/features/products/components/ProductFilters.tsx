@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
-import { SORT_OPTIONS } from '@/core/utils/constants';
+import { SORT_OPTIONS, API } from '@/core/utils/constants';
 import type { ProductFilters as ProductFiltersType } from '@/features/products/types';
 import type { Category } from '@/features/products/types';
 
@@ -16,10 +16,15 @@ export function ProductFilters({ filters, onFiltersChange }: ProductFiltersProps
   const [searchInput, setSearchInput] = useState(filters.search || '');
   const [showFilters, setShowFilters] = useState(false);
 
+  // Sync search input when filters change externally (e.g. from chat navigation)
+  useEffect(() => {
+    setSearchInput(filters.search || '');
+  }, [filters.search]);
+
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const res = await fetch('/api/categories');
+        const res = await fetch(API.categories);
         if (res.ok) {
           const data = await res.json();
           setCategories(data.data || []);

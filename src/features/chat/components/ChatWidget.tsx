@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { MessageCircle, X, Minimize2, Maximize2 } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
@@ -11,16 +11,18 @@ import { buildFilterUrl } from '@/features/chat/utils/buildFilterUrl';
 import { useCartStore } from '@/stores/useCartStore';
 import { useChatStore } from '@/stores/useChatStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useVibeFilterStore } from '@/stores/useVibeFilterStore';
 
 const DEFAULT_SUGGESTIONS = [
   'Show me products',
+  'Show me cheaper options',
   'I need something for a summer wedding',
   'What do you recommend?',
-  'Can I get a discount?',
 ];
 
 export function ChatWidget() {
   const router = useRouter();
+  const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const isOpen = useChatStore((s) => s.isOpen);
   const setOpen = useChatStore((s) => s.setOpen);
@@ -57,6 +59,34 @@ export function ChatWidget() {
     }
   }, [messages, isTyping]);
 
+  async function applyHaggleCodeToCart(code: string): Promise<boolean> {
+    try {
+      const res = await fetch('/api/discount/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (res.ok && data.data) {
+        const meta = data.data;
+        sessionStorage.setItem('discount_code', meta.code);
+        sessionStorage.setItem('discount_meta', JSON.stringify({
+          discount_type: meta.discount_type,
+          discount_value: meta.discount_value,
+          max_discount_amount: meta.max_discount_amount,
+          min_purchase_amount: meta.min_purchase_amount,
+          product_id: meta.product_id,
+        }));
+        useCartStore.getState().fetchCount();
+        window.dispatchEvent(new CustomEvent('discount-code-applied'));
+        return true;
+      }
+    } catch {
+      // Non-critical
+    }
+    return false;
+  }
+
   async function handleSend(content: string) {
     addMessage({
       id: `user-${Date.now()}`,
@@ -91,18 +121,37 @@ export function ChatWidget() {
           products: responseData.products || [],
         });
 
-        // Vibe Filter: if agent used filter/search tools, navigate products page
+        // Vibe Filter: if agent used filter/search tools, update UI instantly
         const actions = responseData.actions;
         if (actions && Array.isArray(actions)) {
-          const filterUrl = buildFilterUrl(actions);
-          if (filterUrl) {
-            router.push(filterUrl);
+          const filterResult = buildFilterUrl(actions);
+          if (filterResult) {
+            // Set message for toast (products page will show it)
+            useVibeFilterStore.getState().setVibeFilter(filterResult.message);
+            // Navigate to products page with filters (or update if already there)
+            const isOnProductsPage = pathname?.startsWith('/products');
+            router.push(filterResult.url);
+            // If already on products page, scroll to top so user sees the update
+            if (isOnProductsPage) {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
           }
 
           // Sync cart badge if agent added items to cart
           if (actions.some((a: { name: string }) => a.name === 'add_to_cart')) {
             useCartStore.getState().fetchCount();
           }
+
+          // Navigate to checkout when agent uses go_to_checkout
+          if (actions.some((a: { name: string }) => a.name === 'go_to_checkout')) {
+            router.push('/checkout');
+          }
+        }
+
+        // Auto-apply haggle coupon — only use the structured field from the API,
+        // never regex on message content (prevents applying hallucinated codes)
+        if (responseData.discountCode) {
+          applyHaggleCodeToCart(responseData.discountCode);
         }
       } else {
         addMessage({

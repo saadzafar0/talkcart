@@ -47,10 +47,10 @@ Customer's message: "${message}"
 
 Respond with a JSON object (and nothing else) with these exact fields:
 {
-  "counter_message": "Your playful, in-character response to the customer",
-  "offered_price": <number - your counter-offer price, between ${minimumPrice} and ${originalPrice}>,
-  "sentiment_score": <number between 0.0 and 1.0 - how polite/positive the customer is>,
-  "accepted": <boolean - true only if the customer's request is reasonable and you want to finalize the deal>
+  "counter_message": "Your response. If rude: be firm, you may raise the price. If lowball: refuse politely.",
+  "offered_price": <number - normally between ${minimumPrice} and ${originalPrice}. For RUDE customers you may RAISE above ${originalPrice} (e.g. ${(originalPrice * 1.1).toFixed(2)}). For lowballs: use ${originalPrice} and refuse>,
+  "sentiment_score": <0.0-1.0: 0.2=rude, 0.5=neutral, 0.9=polite with good reason>,
+  "accepted": <true only if polite + good reason + fair discount. false for rude or lowballs>
 }`;
 
   try {
@@ -74,17 +74,23 @@ Respond with a JSON object (and nothing else) with these exact fields:
 
     const parsed = JSON.parse(jsonMatch[0]);
 
-    // Clamp offered price within bounds
+    // Parse offered price — can exceed original for rude customers
     let offeredPrice = Number(parsed.offered_price) || originalPrice;
-    offeredPrice = Math.max(minimumPrice, Math.min(originalPrice, offeredPrice));
-    offeredPrice = Math.round(offeredPrice * 100) / 100;
+    const sentimentScore = Math.max(0, Math.min(1, Number(parsed.sentiment_score) || 0.5));
 
-    // Ensure we don't exceed max discount
-    const actualDiscount = (originalPrice - offeredPrice) / originalPrice;
-    if (actualDiscount > maxDiscount) {
-      offeredPrice = originalPrice * (1 - maxDiscount);
-      offeredPrice = Math.round(offeredPrice * 100) / 100;
+    if (sentimentScore >= 0.3) {
+      // Polite/neutral: clamp between minimum and original
+      offeredPrice = Math.max(minimumPrice, Math.min(originalPrice, offeredPrice));
+      const actualDiscount = (originalPrice - offeredPrice) / originalPrice;
+      if (actualDiscount > maxDiscount) {
+        offeredPrice = originalPrice * (1 - maxDiscount);
+      }
+    } else {
+      // Rude: allow raising price (up to 15% above original)
+      offeredPrice = Math.max(originalPrice, Math.min(originalPrice * 1.15, offeredPrice));
     }
+
+    offeredPrice = Math.round(offeredPrice * 100) / 100;
 
     return {
       counterMessage: parsed.counter_message || "Let me think about that...",

@@ -31,4 +31,15 @@ export interface SendMessageRequest {
 export interface ChatResponse {
   message: ChatMessage;
   actions?: FunctionCall[];
+  products?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    base_price: number;
+    image_url?: string | null;
+    rating?: number;
+    review_count?: number;
+    stock_quantity?: number;
+  }>;
+  discountCode?: string;
 }

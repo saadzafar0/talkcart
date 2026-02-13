@@ -12,9 +12,46 @@ import { allTools } from '../tools';
 
 const MAX_ITERATIONS = 5;
 
+const PRODUCT_TOOLS = ['get_recommendations', 'search_products', 'filter_products'] as const;
+
+function extractProductsFromToolResult(
+  toolName: string,
+  result: string
+): Array<{ id: string; name: string; slug: string; base_price: number; image_url?: string | null; rating?: number; review_count?: number; stock_quantity?: number }> {
+  if (!PRODUCT_TOOLS.includes(toolName as (typeof PRODUCT_TOOLS)[number])) return [];
+  try {
+    const parsed = JSON.parse(result) as { products?: Array<{ id?: string; name?: string; slug?: string; price?: number; base_price?: number; image?: string | null; image_url?: string | null; rating?: number; review_count?: number; stock_quantity?: number }> };
+    const products = parsed?.products;
+    if (!Array.isArray(products) || products.length === 0) return [];
+    return products.map((p) => ({
+      id: String(p.id ?? ''),
+      name: String(p.name ?? ''),
+      slug: String(p.slug ?? ''),
+      base_price: Number(p.base_price ?? p.price ?? 0),
+      image_url: p.image_url ?? p.image ?? null,
+      rating: p.rating,
+      review_count: p.review_count,
+      stock_quantity: p.stock_quantity,
+    })).filter((p) => p.id);
+  } catch {
+    return [];
+  }
+}
+
 export interface ClerkAgentResult {
   output: string;
   toolCalls: { name: string; args: Record<string, unknown> }[];
+  products?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    base_price: number;
+    image_url?: string | null;
+    rating?: number;
+    review_count?: number;
+    stock_quantity?: number;
+  }>;
+  discountCode?: string;
 }
 
 /**
@@ -29,11 +66,13 @@ export async function clerkAgent(
     userId?: string | null;
   }
 ): Promise<ClerkAgentResult> {
-  const llm = createGeminiLLM(0.7);
+  const llm = createGeminiLLM(0.3);
   const llmWithTools = llm.bindTools(allTools);
   const toolsByName = new Map<string, StructuredToolInterface>(allTools.map((t) => [t.name, t]));
 
   const collectedToolCalls: { name: string; args: Record<string, unknown> }[] = [];
+  let lastProducts: ClerkAgentResult['products'] = [];
+  let haggleDiscountCode: string | undefined;
 
   // Build message history
   const messages: BaseMessage[] = [
@@ -50,7 +89,22 @@ export async function clerkAgent(
 
   // Agentic tool-calling loop
   for (let i = 0; i < MAX_ITERATIONS; i++) {
-    const response = await llmWithTools.invoke(messages);
+    let response;
+    try {
+      response = await llmWithTools.invoke(messages);
+    } catch (err: unknown) {
+      console.error('LLM invocation failed:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      // If this is the first iteration, we have no prior output to fall back on
+      if (i === 0) {
+        return {
+          output: "I'm sorry, I'm having trouble right now. Could you try again?",
+          toolCalls: collectedToolCalls,
+        };
+      }
+      // Otherwise, return whatever we have so far
+      break;
+    }
     messages.push(response);
 
     // Check if the model made tool calls
@@ -61,7 +115,7 @@ export async function clerkAgent(
         typeof response.content === 'string'
           ? response.content
           : response.content.toString();
-      return { output: text, toolCalls: collectedToolCalls };
+      return { output: text, toolCalls: collectedToolCalls, products: lastProducts.length > 0 ? lastProducts : undefined, discountCode: haggleDiscountCode };
     }
 
     // Execute each tool call and append results
@@ -85,6 +139,18 @@ export async function clerkAgent(
         args: tc.args as Record<string, unknown>,
       });
 
+      const extracted = extractProductsFromToolResult(tc.name, result);
+      if (extracted.length > 0) lastProducts = extracted;
+
+      if (tc.name === 'haggle_price') {
+        try {
+          const parsed = JSON.parse(result) as { discount_code?: { code?: string } };
+          if (parsed?.discount_code?.code) haggleDiscountCode = parsed.discount_code.code;
+        } catch {
+          /* ignore */
+        }
+      }
+
       messages.push(
         new ToolMessage({
           content: result,
@@ -102,5 +168,5 @@ export async function clerkAgent(
       : lastAI.content.toString()
     : "I'm still working on that! Could you try again?";
 
-  return { output: fallback, toolCalls: collectedToolCalls };
+  return { output: fallback, toolCalls: collectedToolCalls, products: lastProducts.length > 0 ? lastProducts : undefined, discountCode: haggleDiscountCode };
 }
