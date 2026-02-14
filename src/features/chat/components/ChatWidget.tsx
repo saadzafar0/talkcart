@@ -146,6 +146,11 @@ export function ChatWidget() {
           if (actions.some((a: { name: string }) => a.name === 'go_to_checkout')) {
             router.push('/checkout');
           }
+
+          // Navigate to cart when agent uses go_to_cart
+          if (actions.some((a: { name: string }) => a.name === 'go_to_cart')) {
+            router.push('/cart');
+          }
         }
 
         // Auto-apply haggle coupon — only use the structured field from the API,
