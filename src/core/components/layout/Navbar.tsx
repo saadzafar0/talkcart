@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import {
   MessageCircle,
   ShoppingBag,
@@ -56,8 +57,14 @@ export function Navbar() {
       <div className="mx-auto flex h-[60px] max-w-7xl items-center justify-between px-6">
         {/* Logo */}
         <Link href={user ? '/dashboard' : '/'} className="group flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent-600 to-accent-700 shadow-md shadow-accent-700/25 transition-transform duration-200 group-hover:scale-105">
-            <MessageCircle className="h-[18px] w-[18px] text-primary-900" />
+          <div className="flex h-9 w-9 items-center justify-center transition-transform duration-200 group-hover:scale-105">
+            <Image
+              src="/logo.png"
+              alt="TalkCart Logo"
+              width={36}
+              height={36}
+              className="h-9 w-9 object-contain rounded-lg"
+            />
           </div>
           <span className="text-lg font-bold tracking-tight text-neutral-50">
             Talk<span className="text-accent-500">Cart</span>

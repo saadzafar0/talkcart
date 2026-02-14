@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TalkChart - AI Personal Shopper",
+  title: "TalkCart - AI Personal Shopper",
   description:
     "Shop smarter with your AI personal shopping assistant. Find products, negotiate deals, and checkout — all through conversation.",
 };

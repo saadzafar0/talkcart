@@ -1,6 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
-  MessageCircle,
   ShoppingBag,
   Sparkles,
   BadgePercent,
@@ -16,9 +16,15 @@ export default function HomePage() {
       <nav className="sticky top-0 z-50 border-b border-neutral-200 bg-primary-900">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-2">
-            <MessageCircle className="h-6 w-6 text-accent-600" />
+            <Image
+              src="/logo.png"
+              alt="TalkCart Logo"
+              width={24}
+              height={24}
+              className="h-6 w-6 object-contain rounded-lg"
+            />
             <span className="text-lg font-bold text-neutral-50">
-              TalkChart
+              TalkCart
             </span>
           </Link>
           <div className="flex items-center gap-4">
@@ -220,8 +226,14 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
             <div className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5 text-accent-600" />
-              <span className="font-semibold text-neutral-50">TalkChart</span>
+              <Image
+                src="/logo.png"
+                alt="TalkCart Logo"
+                width={20}
+                height={20}
+                className="h-5 w-5 object-contain rounded-lg"
+              />
+              <span className="font-semibold text-neutral-50">TalkCart</span>
             </div>
             <div className="flex items-center gap-1 text-sm text-neutral-500">
               <ShieldCheck className="h-4 w-4" />

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MessageCircle } from "lucide-react";
+import Image from "next/image";
 
 export default function AuthLayout({
   children,
@@ -12,9 +12,15 @@ export default function AuthLayout({
       <div className="border-b border-neutral-200 bg-primary-900">
         <div className="mx-auto flex h-14 max-w-7xl items-center px-6">
           <Link href="/" className="flex items-center gap-2">
-            <MessageCircle className="h-5 w-5 text-accent-600" />
+            <Image
+              src="/logo.png"
+              alt="TalkCart Logo"
+              width={20}
+              height={20}
+              className="h-5 w-5 object-contain rounded-lg"
+            />
             <span className="text-lg font-bold text-neutral-50">
-              TalkChart
+              TalkCart
             </span>
           </Link>
         </div>
