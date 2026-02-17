@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { MessageRole } from '@/features/chat/types';
 
 export interface ChatMessageData {
@@ -38,24 +39,44 @@ const WELCOME_MESSAGE: ChatMessageData = {
     "Hey there! I'm your AI shopping clerk. I can help you find products, add items to your cart, check stock, and even negotiate prices. What are you looking for today?",
 };
 
-export const useChatStore = create<ChatState>((set) => ({
-  isOpen: false,
-  isMinimized: false,
-  messages: [WELCOME_MESSAGE],
-  sessionId: null,
-  currentUserId: null,
-  setOpen: (open: boolean) => set({ isOpen: open }),
-  setMinimized: (minimized: boolean) => set({ isMinimized: minimized }),
-  addMessage: (message: ChatMessageData) =>
-    set((state) => ({ messages: [...state.messages, message] })),
-  setSessionId: (id: string) => set({ sessionId: id }),
-  setCurrentUserId: (userId: string | null) => set({ currentUserId: userId }),
-  clearChat: () =>
-    set({
+export const useChatStore = create<ChatState>()(
+  persist(
+    (set) => ({
+      isOpen: false,
+      isMinimized: false,
       messages: [WELCOME_MESSAGE],
       sessionId: null,
       currentUserId: null,
-      isOpen: false,
-      isMinimized: false,
+      setOpen: (open: boolean) => set({ isOpen: open }),
+      setMinimized: (minimized: boolean) => set({ isMinimized: minimized }),
+      addMessage: (message: ChatMessageData) =>
+        set((state) => ({ messages: [...state.messages, message] })),
+      setSessionId: (id: string) => set({ sessionId: id }),
+      setCurrentUserId: (userId: string | null) => set({ currentUserId: userId }),
+      clearChat: () =>
+        set({
+          messages: [WELCOME_MESSAGE],
+          sessionId: null,
+          currentUserId: null,
+          isOpen: false,
+          isMinimized: false,
+        }),
     }),
-}));
+    {
+      name: 'talkchart-chat',
+      storage: createJSONStorage(() =>
+        typeof window !== 'undefined' ? sessionStorage : {
+          getItem: () => null,
+          setItem: () => {},
+          removeItem: () => {},
+        }
+      ),
+      // Only persist messages, sessionId, and currentUserId — not UI state
+      partialize: (state) => ({
+        messages: state.messages,
+        sessionId: state.sessionId,
+        currentUserId: state.currentUserId,
+      }),
+    }
+  )
+);

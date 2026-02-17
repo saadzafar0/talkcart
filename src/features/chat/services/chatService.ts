@@ -8,7 +8,7 @@ export const chatService = {
    * Send a message and get AI response via the Clerk Agent
    */
   async sendMessage(userId: string | null, data: SendMessageRequest): Promise<ChatResponse> {
-    const { message, session_id } = data;
+    const { message, session_id, last_shown_products } = data;
 
     // Get or create chat session
     const session = await this.getOrCreateSession(userId, session_id);
@@ -23,6 +23,7 @@ export const chatService = {
     const agentResult = await clerkAgent(message, {
       chatHistory,
       userId,
+      lastShownProducts: last_shown_products,
     });
 
     // Build function_calls array from tool invocations

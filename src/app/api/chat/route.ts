@@ -5,6 +5,26 @@ import { SendMessageRequest } from '@/features/chat/types';
 import { getAuthCookie } from '@/lib/auth/cookies';
 import { verifyToken } from '@/lib/auth/jwt';
 
+const MAX_MESSAGE_LENGTH = 2000;
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 20;
+
+// Simple in-memory rate limiter (per user/IP)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function isRateLimited(key: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+
+  entry.count++;
+  return entry.count > RATE_LIMIT_MAX_REQUESTS;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body: SendMessageRequest = await req.json();
@@ -12,6 +32,11 @@ export async function POST(req: NextRequest) {
     // Validate required fields
     if (!body.message || body.message.trim().length === 0) {
       return errorResponse('message is required', 400);
+    }
+
+    // Validate message length
+    if (body.message.length > MAX_MESSAGE_LENGTH) {
+      return errorResponse(`Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters.`, 400);
     }
 
     // Check if user is authenticated (optional - chat can work for anonymous users)
@@ -24,6 +49,12 @@ export async function POST(req: NextRequest) {
       }
     } catch {
       // User not authenticated - that's okay, chat works for anonymous users
+    }
+
+    // Rate limiting (by userId or IP)
+    const rateLimitKey = userId || req.headers.get('x-forwarded-for') || 'anonymous';
+    if (isRateLimited(rateLimitKey)) {
+      return errorResponse('Too many messages. Please wait a moment before trying again.', 429);
     }
 
     // Send message and get response

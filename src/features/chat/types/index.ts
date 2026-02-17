@@ -26,6 +26,7 @@ export interface FunctionCall {
 export interface SendMessageRequest {
   message: string;
   session_id?: string;
+  last_shown_products?: Array<{ id: string; name: string }>;
 }
 
 export interface ChatResponse {
