@@ -53,6 +53,47 @@ export function ChatWidget() {
     }
   }, [user?.id, currentUserId, clearChat, setCurrentUserId]);
 
+  // Personalized welcome message for logged-in users
+  const [welcomeLoaded, setWelcomeLoaded] = useState(false);
+  useEffect(() => {
+    if (!isOpen || !user?.id || welcomeLoaded) return;
+    // Only personalize if we still have just the default welcome
+    if (messages.length !== 1 || messages[0].id !== 'welcome') return;
+
+    setWelcomeLoaded(true);
+    const firstName = user.full_name?.split(' ')[0] || '';
+
+    // Fire-and-forget: fetch recent activity for a personalized greeting
+    fetch('/api/activity/recent?limit=3')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const activities = data?.data || [];
+        const searches = activities
+          .filter((a: { activity_type: string }) => a.activity_type === 'search')
+          .map((a: { metadata?: { query?: string } }) => a.metadata?.query)
+          .filter(Boolean)
+          .slice(0, 2);
+
+        let greeting = firstName
+          ? `Welcome back, ${firstName}! `
+          : 'Welcome back! ';
+        
+        if (searches.length > 0) {
+          greeting += `Last time you were looking at "${searches[0]}". Want to pick up where you left off, or try something new?`;
+        } else {
+          greeting += "I'm your AI shopping clerk. I can help you find products, add items to your cart, check stock, and even negotiate prices. What are you looking for today?";
+        }
+
+        // Replace the welcome message
+        useChatStore.setState({
+          messages: [{ id: 'welcome', role: 'assistant', content: greeting }],
+        });
+      })
+      .catch(() => {
+        // Keep default welcome on error
+      });
+  }, [isOpen, user, messages, welcomeLoaded]);
+
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -96,12 +137,17 @@ export function ChatWidget() {
     setIsTyping(true);
 
     try {
+      // Collect last shown products from most recent assistant message with products
+      const lastProductMsg = [...messages].reverse().find((m) => m.products && m.products.length > 0);
+      const lastShownProducts = lastProductMsg?.products?.map((p) => ({ id: p.id, name: p.name })) || [];
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: content,
           session_id: sessionId,
+          last_shown_products: lastShownProducts.length > 0 ? lastShownProducts : undefined,
         }),
       });
 
@@ -137,8 +183,9 @@ export function ChatWidget() {
             }
           }
 
-          // Sync cart badge if agent added items to cart
-          if (actions.some((a: { name: string }) => a.name === 'add_to_cart')) {
+          // Sync cart badge if agent modified cart
+          const cartActions = ['add_to_cart', 'remove_from_cart', 'update_cart_quantity'];
+          if (actions.some((a: { name: string }) => cartActions.includes(a.name))) {
             useCartStore.getState().fetchCount();
           }
 
